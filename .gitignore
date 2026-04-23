@@ -1,2 +1,33 @@
 # Dependencies
 node_modules/
+
+# Build output
+dist/
+build/
+out/
+
+# Electron build output
+release/
+front-end/release/
+
+# IDE
+.idea/
+.vscode/
+
+# OS files
+.DS_Store
+
+# Logs
+logs/
+
+# Cache
+.cache/
+.parcel-cache/
+.vite/
+
+# Test coverage
+coverage/
+
+# Temporary files
+tmp/
+temp/
