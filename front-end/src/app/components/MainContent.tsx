@@ -2,7 +2,8 @@ import {
   Paperclip, Mic, ArrowUp, Target, TrendingUp, Activity, Cpu, X, FileText,
   Image as ImageIcon, HardDrive, Upload, Table, Plus, Home
 } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { callOpenClawGateway } from '../../services/openclawGateway';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { ChatPanel } from './ChatPanel';
 import { RightPanelContainer } from './RightPanelContainer';
@@ -288,7 +289,7 @@ export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onU
     scrollToBottom();
   }, [messages, isTyping]);
 
-  const handleSendMessage = () => {
+  const handleSendMessage = useCallback(async () => {
     if (!inputValue.trim()) return;
 
     const userMessage: Message = {
@@ -307,42 +308,85 @@ export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onU
       handleOpenTab('chat', inputValue.trim().substring(0, 30), taskIdToUse);
     }
 
-    if (taskIdToUse) {
-      setMessagesMap(prev => ({
-        ...prev,
-        [taskIdToUse!]: [...(prev[taskIdToUse!] || []), userMessage]
-      }));
-    }
-
+    const userContent = inputValue.trim();
     setInputValue('');
     setAttachedFiles([]);
     setAttachedLibraryFiles([]);
-
     setMessageSentTrigger(prev => prev + 1);
 
     if (taskIdToUse) {
+      setMessagesMap(prev => ({
+        ...prev,
+        [taskIdToUse!]: [...(prev[taskIdToUse!] || []), userMessage],
+      }));
       onUpdateTaskStatus(taskIdToUse, 'working');
     }
 
     setIsTyping(true);
-    setTimeout(() => {
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: '我已经收到您的工作需求。让我为您分析和处理...',
-        timestamp: new Date(),
-      };
 
+    // 创建一个空的助手消息用于流式更新
+    const assistantMsgId = (Date.now() + 1).toString();
+    if (taskIdToUse) {
+      setMessagesMap(prev => ({
+        ...prev,
+        [taskIdToUse!]: [
+          ...(prev[taskIdToUse!] || []),
+          { id: assistantMsgId, role: 'assistant', content: '', timestamp: new Date() },
+        ],
+      }));
+    }
+
+    try {
+      const { text } = await callOpenClawGateway(
+        userContent,
+        (_chunk, accumulated) => {
+          // 每次收到新内容，更新助手消息
+          if (taskIdToUse) {
+            setMessagesMap(prev => {
+              const msgs = prev[taskIdToUse!] || [];
+              return {
+                ...prev,
+                [taskIdToUse!]: msgs.map(m =>
+                  m.id === assistantMsgId ? { ...m, content: accumulated } : m
+                ),
+              };
+            });
+          }
+        }
+      );
+
+      // 流结束后用最终文本兜底（非流式时直接赋值）
       if (taskIdToUse) {
-        setMessagesMap(prev => ({
-          ...prev,
-          [taskIdToUse!]: [...(prev[taskIdToUse!] || []), assistantMessage]
-        }));
+        setMessagesMap(prev => {
+          const msgs = prev[taskIdToUse!] || [];
+          return {
+            ...prev,
+            [taskIdToUse!]: msgs.map(m =>
+              m.id === assistantMsgId ? { ...m, content: text || m.content } : m
+            ),
+          };
+        });
         onUpdateTaskStatus(taskIdToUse, 'completed');
       }
+    } catch (err: any) {
+      const errorText = `⚠️ ${err?.message || '连接 OpenClaw Gateway 失败，请检查配置。'}`;
+      if (taskIdToUse) {
+        setMessagesMap(prev => {
+          const msgs = prev[taskIdToUse!] || [];
+          return {
+            ...prev,
+            [taskIdToUse!]: msgs.map(m =>
+              m.id === assistantMsgId ? { ...m, content: errorText } : m
+            ),
+          };
+        });
+        onUpdateTaskStatus(taskIdToUse, 'error');
+      }
+    } finally {
       setIsTyping(false);
-    }, 1000);
-  };
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputValue, effectiveTaskId, onAddTask, onUpdateTaskStatus]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;

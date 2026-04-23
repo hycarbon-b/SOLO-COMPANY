@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Laptop, Cpu, HardDrive, Shield, RefreshCw, Copy, Check } from 'lucide-react';
+import { GatewayStatusPanel } from './GatewayStatusPanel';
 
 export function AboutPage() {
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -201,6 +202,9 @@ export function AboutPage() {
               />
             </div>
           </div>
+
+          {/* Gateway Debug Panel */}
+          <GatewayStatusPanel />
 
           {/* Footer Info */}
           <div className="text-center text-xs text-gray-400 pt-4 pb-2">

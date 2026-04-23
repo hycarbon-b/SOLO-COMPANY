@@ -6,24 +6,44 @@
 
 import { ref } from 'vue'
 
-// Gateway 地址（WebSocket 和 HTTP 使用同一端口）
-const GATEWAY_HOST = '127.0.0.1:18789'
-const GATEWAY_WS_URL = `ws://${GATEWAY_HOST}`
-const GATEWAY_HTTP_URL = `http://${GATEWAY_HOST}`
+// Gateway 地址（从 .env 加载，支持 WebSocket 和 HTTP）
+const loadGatewayConfig = () => {
+  const gatewayUrl = import.meta.env.VITE_OPENCLAW_GATEWAY_URL || 'http://127.0.0.1:18789'
+  const gatewayKey = import.meta.env.VITE_OPENCLAW_GATEWAY_KEY || ''
+  
+  // 转换 HTTP URL 为 WebSocket URL
+  const wsUrl = gatewayUrl.replace(/^http:\/\//, 'ws://').replace(/^https:\/\//, 'wss://')
+  
+  return {
+    GATEWAY_HTTP_URL: gatewayUrl,
+    GATEWAY_WS_URL: wsUrl,
+    GATEWAY_KEY: gatewayKey
+  }
+}
+
+let config = loadGatewayConfig()
 
 // 从 localStorage 获取 token
 const STORAGE_KEY = 'openclaw-token'
 
 export function getToken() {
-  return localStorage.getItem(STORAGE_KEY) || ''
+  return localStorage.getItem(STORAGE_KEY) || config.GATEWAY_KEY || ''
 }
 
 export function setToken(token) {
   if (token) {
     localStorage.setItem(STORAGE_KEY, token)
+    config = loadGatewayConfig()
   } else {
     localStorage.removeItem(STORAGE_KEY)
   }
+}
+
+/**
+ * 获取 Gateway 配置
+ */
+export function getGatewayConfig() {
+  return config
 }
 
 // ===== 授权状态（原 approval.js） =====
@@ -231,7 +251,7 @@ function getWebSocket() {
     try {
       const token = getToken()
       // 通过 query 参数传递 token
-      const wsUrl = `${GATEWAY_WS_URL}?token=${token}`
+      const wsUrl = `${config.GATEWAY_WS_URL}?token=${token}`
       ws = new WebSocket(wsUrl)
       ws._authenticated = false
 
@@ -841,7 +861,7 @@ export async function checkGatewayStatus() {
   try {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 1500) // 最多等 1.5 秒
-    const response = await fetch(`${GATEWAY_HTTP_URL}/`, {
+    const response = await fetch(`${config.GATEWAY_HTTP_URL}/`, {
       method: 'HEAD',
       mode: 'no-cors',
       signal: controller.signal
@@ -874,7 +894,7 @@ export async function callOpenClawHTTP(message, agent = 'main') {
     throw new Error('Token not set. Please configure OpenClaw Gateway token.')
   }
 
-  const url = `${GATEWAY_HTTP_URL}/v1/chat/completions`
+  const url = `${config.GATEWAY_HTTP_URL}/v1/chat/completions`
   console.log('[OpenClaw HTTP] Calling:', url)
 
   try {
@@ -936,7 +956,7 @@ export async function testGatewayConnection() {
   
   // 测试 WebSocket
   try {
-    const wsUrl = `${GATEWAY_WS_URL}?token=${getToken()}`
+    const wsUrl = `${config.GATEWAY_WS_URL}?token=${getToken()}`
     const testWs = new WebSocket(wsUrl)
     await new Promise((resolve, reject) => {
       testWs.onopen = () => {
@@ -964,7 +984,7 @@ export async function testGatewayConnection() {
   
   // 测试 HTTP
   try {
-    const res = await fetch(`${GATEWAY_HTTP_URL}/v1/models`, {
+    const res = await fetch(`${config.GATEWAY_HTTP_URL}/v1/models`, {
       headers: { 'Authorization': `Bearer ${getToken()}` }
     })
     results.http = `status ${res.status}`
