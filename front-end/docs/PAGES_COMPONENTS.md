@@ -52,6 +52,7 @@
 |------|----------|------|
 | `types/discussion.ts` | `DiscussionEntry`, `DiscussionThread` | Discussion数据结构 |
 | `types/electron.d.ts` | `ElectronAPI` | Electron IPC类型定义 |
+| `app/fakeChatData.ts` | `Message`, `LibraryFile`, `fakeMessagesMap`, `libraryFiles` | 模拟聊天数据（demo用） |
 
 ---
 

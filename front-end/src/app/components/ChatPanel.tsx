@@ -156,23 +156,29 @@ export function ChatPanel({ messages, isTyping, inputValue, setInputValue, onSen
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto px-6 pt-6 bg-white">
         <div className="max-w-4xl mx-auto pb-2">
-          {messages.map((message) => (
-            <div key={message.id} className={`mb-6 ${message.role === 'user' ? 'flex justify-end' : ''}`}>
-              {message.role === 'assistant' && (
-                <div className="flex gap-3">
-                  <div className="w-8 h-8 bg-gray-900 rounded-full flex items-center justify-center flex-shrink-0">
-                    <span className="text-white text-xs">AI</span>
-                  </div>
-                  <div className="flex-1">
-                    {message.isStrategy ? (
-                      <div className="max-w-2xl">
-                        <div className="bg-white rounded-2xl px-4 py-3 shadow-sm mb-3">
-                          <div className="text-gray-900 prose prose-sm max-w-none"><ReactMarkdown>{message.content}</ReactMarkdown></div>
-                        </div>
-                        <StrategyCard
-                          title="双均线交易策略"
-                          description="基于5日和20日移动平均线的经典交易策略，当短期均线上穿长期均线时买入，下穿时卖出"
-                          code={`# 双均线交易策略
+          {messages.map((message) => {
+            // 跳过空内容的助手消息（流式初始化时的空消息）
+            if (message.role === 'assistant' && !message.content && !message.isStrategy && !message.isStockPicker) {
+              return null;
+            }
+            
+            return (
+              <div key={message.id} className={`mb-6 ${message.role === 'user' ? 'flex justify-end' : ''}`}>
+                {message.role === 'assistant' && (
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 bg-gray-900 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-white text-xs">AI</span>
+                    </div>
+                    <div className="flex-1">
+                      {message.isStrategy ? (
+                        <div className="max-w-2xl">
+                          <div className="bg-white rounded-2xl px-4 py-3 shadow-sm mb-3">
+                            <div className="text-gray-900 prose prose-sm max-w-none"><ReactMarkdown>{message.content}</ReactMarkdown></div>
+                          </div>
+                          <StrategyCard
+                            title="双均线交易策略"
+                            description="基于5日和20日移动平均线的经典交易策略，当短期均线上穿长期均线时买入，下穿时卖出"
+                            code={`# 双均线交易策略
 import pandas as pd
 import numpy as np
 
@@ -190,8 +196,8 @@ def dual_ma_strategy(data, short_window=5, long_window=20):
 
     # 生成交易信号
     data['signal'] = 0
-    data.loc[data['short_ma'] > data['long_ma'], 'signal'] = 1  # 买入信号
-    data.loc[data['short_ma'] < data['long_ma'], 'signal'] = -1  # 卖出信号
+    data.loc[data['short_ma'] > data['long_ma'], 'signal'] = 1  // 买入信号
+    data.loc[data['short_ma'] < data['long_ma'], 'signal'] = -1  // 卖出信号
 
     # 计算持仓变化
     data['position'] = data['signal'].diff()
@@ -200,32 +206,33 @@ def dual_ma_strategy(data, short_window=5, long_window=20):
 
 # 使用示例
 # df = dual_ma_strategy(stock_data)
-# buy_signals = df[df['position'] == 2]
-# sell_signals = df[df['position'] == -2]`}
-                        />
-                      </div>
-                    ) : message.isStockPicker ? (
-                      <div className="max-w-4xl">
-                        <div className="bg-white rounded-2xl px-4 py-3 shadow-sm mb-3">
-                          <div className="text-gray-900 whitespace-pre-line prose prose-sm max-w-none"><ReactMarkdown>{message.content}</ReactMarkdown></div>
+// buy_signals = df[df['position'] == 2]
+// sell_signals = df[df['position'] == -2]`}
+                          />
                         </div>
-                        <StockPickerTable />
-                      </div>
-                    ) : (
-                      <div className="bg-white rounded-2xl px-4 py-3 inline-block max-w-2xl shadow-sm">
-                        <div className="text-gray-900 prose prose-sm max-w-none"><ReactMarkdown>{message.content}</ReactMarkdown></div>
-                      </div>
-                    )}
+                      ) : message.isStockPicker ? (
+                        <div className="max-w-4xl">
+                          <div className="bg-white rounded-2xl px-4 py-3 shadow-sm mb-3">
+                            <div className="text-gray-900 whitespace-pre-line prose prose-sm max-w-none"><ReactMarkdown>{message.content}</ReactMarkdown></div>
+                          </div>
+                          <StockPickerTable />
+                        </div>
+                      ) : (
+                        <div className="bg-white rounded-2xl px-4 py-3 inline-block max-w-2xl shadow-sm">
+                          <div className="text-gray-900 prose prose-sm max-w-none"><ReactMarkdown>{message.content}</ReactMarkdown></div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
-              {message.role === 'user' && (
-                <div className="bg-gray-900 text-white rounded-2xl px-4 py-3 inline-block max-w-2xl shadow-sm">
-                  <p>{message.content}</p>
-                </div>
-              )}
-            </div>
-          ))}
+                )}
+                {message.role === 'user' && (
+                  <div className="bg-gray-900 text-white rounded-2xl px-4 py-3 inline-block max-w-2xl shadow-sm">
+                    <p>{message.content}</p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
 
           {isTyping && (
             <div className="mb-6 flex gap-3">
