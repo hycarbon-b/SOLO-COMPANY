@@ -90,6 +90,109 @@ ipcMain.handle('ws-log', async (event, { prefix, data }) => {
 // Discussion file reading - read from d:\code\temp\discussion
 const discussionDir = 'd:\\code\\temp\\discussion'
 
+// File watcher for D:\code\temp\resource
+const resourceDir = 'D:\\code\\temp\\resource'
+let fileWatcher = null
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+}
+
+function getFileType(filename) {
+  const ext = path.extname(filename).toLowerCase()
+  const typeMap = {
+    '.pdf': 'document', '.doc': 'document', '.docx': 'document', '.txt': 'document',
+    '.png': 'image', '.jpg': 'image', '.jpeg': 'image', '.gif': 'image', '.bmp': 'image',
+    '.xls': 'spreadsheet', '.xlsx': 'spreadsheet', '.csv': 'spreadsheet',
+    '.py': 'code', '.js': 'code', '.ts': 'code', '.json': 'code'
+  }
+  return typeMap[ext] || 'document'
+}
+
+async function getFileList() {
+  try {
+    if (!fs.existsSync(resourceDir)) {
+      await fs.promises.mkdir(resourceDir, { recursive: true })
+      return []
+    }
+    const files = await fs.promises.readdir(resourceDir)
+    const entries = []
+    
+    for (const file of files) {
+      try {
+        const filePath = path.join(resourceDir, file)
+        const stats = await fs.promises.stat(filePath)
+        if (stats.isFile()) {
+          entries.push({
+            id: Buffer.from(file).toString('base64').slice(0, 8),
+            name: file,
+            type: getFileType(file),
+            size: formatFileSize(stats.size),
+            date: stats.mtime.toLocaleDateString('zh-CN'),
+            path: filePath
+          })
+        }
+      } catch (e) {
+        debug('Error reading file:', file, e.message)
+      }
+    }
+    return entries
+  } catch (e) {
+    debug('Error listing files:', e.message)
+    return []
+  }
+}
+
+// IPC: list files in resource folder
+ipcMain.handle('resource:list', async () => {
+  const files = await getFileList()
+  return { success: true, files }
+})
+
+// IPC: watch resource folder
+ipcMain.handle('resource:watch', async () => {
+  if (fileWatcher) {
+    fileWatcher.close()
+  }
+  
+  const watchCallback = (eventType, filename) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      getFileList().then(files => {
+        mainWindow.webContents.send('resource:changed', { files })
+      })
+    }
+  }
+  
+  if (fs.existsSync(resourceDir)) {
+    fileWatcher = fs.watch(resourceDir, { recursive: true }, watchCallback)
+    debug('Started watching:', resourceDir)
+  }
+  
+  return { success: true }
+})
+
+// IPC: unwatch resource folder
+ipcMain.handle('resource:unwatch', async () => {
+  if (fileWatcher) {
+    fileWatcher.close()
+    fileWatcher = null
+    debug('Stopped watching resource folder')
+  }
+  return { success: true }
+})
+
+// IPC: read file content
+ipcMain.handle('resource:read', async (event, filePath) => {
+  try {
+    const content = await fs.promises.readFile(filePath, 'utf-8')
+    return { success: true, content }
+  } catch (e) {
+    return { success: false, error: e.message }
+  }
+})
+
 ipcMain.handle('discussion:list', async () => {
   try {
     debug('Reading discussion from:', discussionDir)

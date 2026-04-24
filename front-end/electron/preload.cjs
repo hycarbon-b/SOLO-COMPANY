@@ -7,12 +7,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Discussion file operations
   getDiscussions: () => ipcRenderer.invoke('discussion:list'),
   
+  // Resource file operations
+  getResourceFiles: () => ipcRenderer.invoke('resource:list'),
+  watchResourceFiles: () => ipcRenderer.invoke('resource:watch'),
+  unwatchResourceFiles: () => ipcRenderer.invoke('resource:unwatch'),
+  readResourceFile: (filePath) => ipcRenderer.invoke('resource:read', filePath),
+  onResourceChanged: (callback) => {
+    ipcRenderer.on('resource:changed', (event, data) => callback(data))
+  },
+    removeResourceListener: () => {
+      ipcRenderer.removeAllListeners('resource:changed');
+    },
+  
   platform: process.platform,
   versions: {
     node: process.versions.node,
     chrome: process.versions.chrome,
     electron: process.versions.electron,
-  }
-    // WS日志写入
-    wsLog: (prefix, data) => ipcRenderer.invoke('ws-log', { prefix, data }),
-})
+  },
+  // WS日志写入
+  wsLog: (prefix, data) => ipcRenderer.invoke('ws-log', { prefix, data }),
+});

@@ -11,6 +11,7 @@ interface FileItem {
   size: string;
   date: string;
   content?: string;
+    path?: string;
 }
 
 interface RightPanelContainerProps {
@@ -24,6 +25,60 @@ export function RightPanelContainer({ onMessageSent, discussions }: RightPanelCo
     { id: '2', name: '市场趋势图.png', type: 'image', size: '456 KB', date: '3小时前' },
     { id: '3', name: '交易数据.xlsx', type: 'spreadsheet', size: '1.2 MB', date: '1天前', content: '交易日期,股票代码,买入价,卖出价,盈亏\n2024-01-20,600519,1850.00,1920.00,+70.00' },
   ]);
+  const [filesLoading, setFilesLoading] = useState(false);
+
+  // Load files from Electron API
+  const loadResourceFiles = async () => {
+    try {
+      if (window.electronAPI) {
+        const result = await window.electronAPI.getResourceFiles();
+        if (result.success && result.files.length > 0) {
+          setFiles(result.files.map((f: any) => ({
+            id: f.id,
+            name: f.name,
+            type: f.type as 'document' | 'image' | 'spreadsheet' | 'code',
+            size: f.size,
+            date: f.date,
+            path: f.path
+          })));
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load resource files:', e);
+    }
+  };
+
+  // Initialize file watching
+  useEffect(() => {
+    loadResourceFiles();
+    
+    // Start watching
+    window.electronAPI?.watchResourceFiles();
+    
+    // Listen for file changes
+    const handleFileChange = (data: { files: any[] }) => {
+      setFiles(data.files.map((f: any) => ({
+        id: f.id,
+        name: f.name,
+        type: f.type as 'document' | 'image' | 'spreadsheet' | 'code',
+        size: f.size,
+        date: f.date,
+        path: f.path
+      })));
+    };
+    
+    window.electronAPI?.onResourceChanged(handleFileChange);
+    
+    return () => {
+      window.electronAPI?.unwatchResourceFiles();
+    };
+  }, []);
+
+  const handleRefreshFiles = async () => {
+    setFilesLoading(true);
+    await loadResourceFiles();
+    setFilesLoading(false);
+  };
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
   const [agentMessages, setAgentMessages] = useState<Array<{
@@ -51,15 +106,6 @@ export function RightPanelContainer({ onMessageSent, discussions }: RightPanelCo
     e.stopPropagation();
     setFiles(files.filter(f => f.id !== fileId));
     setOpenMenuId(null);
-  };
-
-  const handleRefreshFiles = () => {
-    // 模拟刷新文件列表
-    setFiles([
-      { id: '1', name: '股票分析报告.pdf', type: 'document', size: '2.3 MB', date: '刚刚', content: '# 股票分析报告\n\n## 市场概况\n\n本报告分析了当前市场的整体情况...' },
-      { id: '2', name: '市场趋势图.png', type: 'image', size: '456 KB', date: '刚刚' },
-      { id: '3', name: '交易数据.xlsx', type: 'spreadsheet', size: '1.2 MB', date: '刚刚', content: '交易日期,股票代码,买入价,卖出价,盈亏\n2024-01-20,600519,1850.00,1920.00,+70.00' },
-    ]);
   };
 
   const handlePreviewFile = (file: FileItem, e: React.MouseEvent) => {
