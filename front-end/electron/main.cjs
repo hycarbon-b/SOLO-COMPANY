@@ -219,32 +219,54 @@ ipcMain.handle('discussion:list', async () => {
     
     for (const entry of entries) {
       const key = entry.skill_id + '|' + (entry.task_objective || '')
-      if (entry.event === 'discussion_start') {
+        if (entry.event === 'start') {
         startMap.set(key, entry)
-      } else if (entry.event === 'discussion_end' && startMap.has(key)) {
+        } else if (entry.event === 'end' && startMap.has(key)) {
         const start = startMap.get(key)
-        threads.push({
-          skill_id: entry.skill_id,
-          task_objective: entry.task_objective,
-          start_time: start.timestamp,
-          end_time: entry.timestamp,
-          start,
-          end: entry,
-        })
+          const startTime = new Date(start.timestamp)
+          const endTime = new Date(entry.timestamp)
+          threads.push({
+            id: key,
+            skill_id: entry.skill_id,
+            startRecord: {
+              worker_label: start.worker_label,
+              worker_name: start.worker_name,
+              task_objective: start.task_objective,
+              timestamp: start.timestamp,
+              skill_id: start.skill_id,
+            },
+            endRecord: {
+              status: entry.status || 'success',
+              summary: entry.summary || '',
+              timestamp: entry.timestamp,
+            },
+            startTime,
+            endTime,
+            isActive: false,
+            duration: endTime - startTime,
+          })
         startMap.delete(key)
       }
     }
     
-    // Add unpaired starts as incomplete
+      // Add unpaired starts as incomplete (active)
     for (const [, start] of startMap) {
-      threads.push({
-        skill_id: start.skill_id,
-        task_objective: start.task_objective,
-        start_time: start.timestamp,
-        end_time: null,
-        start,
-        end: null,
-      })
+        threads.push({
+          id: start.skill_id + '|' + (start.task_objective || ''),
+          skill_id: start.skill_id,
+          startRecord: {
+            worker_label: start.worker_label,
+            worker_name: start.worker_name,
+            task_objective: start.task_objective,
+            timestamp: start.timestamp,
+            skill_id: start.skill_id,
+          },
+          endRecord: null,
+          startTime: new Date(start.timestamp),
+          endTime: null,
+          isActive: true,
+          duration: null,
+        })
     }
     
     debug('Found', threads.length, 'discussion threads')
