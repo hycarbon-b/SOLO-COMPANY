@@ -1,12 +1,12 @@
 ---
 name: discussion_recorder
-description: Record employee task lifecycle events as timestamped JSON files in the discussion/ folder. Always call this skill immediately before and after invoking any employee skill.
+description: Record employee task lifecycle events as timestamped JSON files in /mnt/d/code/temp/discussion/. Always call this skill immediately before and after invoking any employee skill.
 user-invocable: false
 ---
 
 # Discussion Recorder
 
-This skill writes structured JSON records to the `discussion/` folder to track
+This skill writes structured JSON records to `/mnt/d/code/temp/discussion/` to track
 the full lifecycle of every employee skill invocation. It serves as the
 persistent audit log that the frontend reads to render the task panel — keeping
 structured data out of the conversation context.
@@ -22,20 +22,20 @@ Call this skill **twice** for every employee skill you invoke:
 
 ### Step 1 — Ensure the folder exists
 
-Use the `create_directory` tool (or equivalent) to ensure `discussion/` exists:
+Use the `exec` tool to ensure `/mnt/d/code/temp/discussion/` exists:
 
 ```
-create_directory("discussion")
+exec("mkdir -p /mnt/d/code/temp/discussion")
 ```
 
 ### Step 2 — Generate a timestamp key
 
-Use the current UTC time formatted as `YYYYMMDDHHmmss`, e.g. `20260422103000`.
+Use the current UTC time formatted as `YYYYMMDDHHmmssSSS` (milliseconds included), e.g. `20260422103000123`.
 This becomes the filename prefix.
 
 ### Step 3 — Write the start record (before calling the employee skill)
 
-Write a file named `discussion/{timestamp}_{skill_id}_start.json`:
+Write a file named `/mnt/d/code/temp/discussion/{timestamp}_{skill_id}_start.json` (timestamp to millisecond precision):
 
 ```json
 {
@@ -56,8 +56,8 @@ Invoke the employee skill normally and wait for its response.
 
 ### Step 5 — Write the end record (after the employee skill completes)
 
-Write a file named `discussion/{timestamp}_{skill_id}_end.json`
-(use the **same timestamp** as the start record for this invocation):
+Write a file named `/mnt/d/code/temp/discussion/{timestamp}_{skill_id}_end.json`
+(use the **same timestamp** as the start record for this invocation, to millisecond precision):
 
 ```json
 {
@@ -80,7 +80,7 @@ Write a file named `discussion/{timestamp}_{skill_id}_end.json`
 ## Field rules
 
 - `schema` — always `"discussion_entry_v1"`, never change this value
-- `timestamp` — ISO 8601 with milliseconds, e.g. `"2026-04-22T10:30:00.000Z"`
+- `timestamp` — ISO 8601 with milliseconds, e.g. `"2026-04-22T10:30:00.123Z"`; filename key uses `YYYYMMDDHHmmssSSS` (17 digits)
 - `skill_id` — use the snake_case skill name, e.g. `"employee_cto"`, `"employee_cpo"`
 - `worker_label` — human-readable role title in the format `"ROLE · 中文职位"` 
 - `summary` — **end only** — extract the single most important conclusion; 1–2 sentences max
@@ -91,6 +91,6 @@ Write a file named `discussion/{timestamp}_{skill_id}_end.json`
 ## Important
 
 - Always use UTF-8 encoding for the JSON files
-- The `discussion/` folder path is relative to the current workspace root
+- The discussion folder is always the **absolute path** `/mnt/d/code/temp/discussion/`
 - Do **not** include the employee skill's full raw text in any discussion record field; keep all values concise
 - If an employee skill call fails or times out, still write an `end` record with `"status": "failed"` and a brief `"summary"` describing what went wrong

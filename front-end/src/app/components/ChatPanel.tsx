@@ -1,4 +1,5 @@
 import { Paperclip, Mic, ArrowUp, Edit2, X, FileText, Image as ImageIcon, HardDrive, Upload, Table } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { useState, useRef, useEffect } from 'react';
 import { StrategyCard } from './StrategyCard';
 import { StockPickerTable } from './StockPickerTable';
@@ -166,7 +167,7 @@ export function ChatPanel({ messages, isTyping, inputValue, setInputValue, onSen
                     {message.isStrategy ? (
                       <div className="max-w-2xl">
                         <div className="bg-white rounded-2xl px-4 py-3 shadow-sm mb-3">
-                          <p className="text-gray-900">{message.content}</p>
+                          <div className="text-gray-900 prose prose-sm max-w-none"><ReactMarkdown>{message.content}</ReactMarkdown></div>
                         </div>
                         <StrategyCard
                           title="双均线交易策略"
@@ -206,13 +207,13 @@ def dual_ma_strategy(data, short_window=5, long_window=20):
                     ) : message.isStockPicker ? (
                       <div className="max-w-4xl">
                         <div className="bg-white rounded-2xl px-4 py-3 shadow-sm mb-3">
-                          <p className="text-gray-900 whitespace-pre-line">{message.content}</p>
+                          <div className="text-gray-900 whitespace-pre-line prose prose-sm max-w-none"><ReactMarkdown>{message.content}</ReactMarkdown></div>
                         </div>
                         <StockPickerTable />
                       </div>
                     ) : (
                       <div className="bg-white rounded-2xl px-4 py-3 inline-block max-w-2xl shadow-sm">
-                        <p className="text-gray-900">{message.content}</p>
+                        <div className="text-gray-900 prose prose-sm max-w-none"><ReactMarkdown>{message.content}</ReactMarkdown></div>
                       </div>
                     )}
                   </div>

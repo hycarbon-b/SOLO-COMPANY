@@ -9,7 +9,8 @@ import { ChatPanel } from './ChatPanel';
 import { RightPanelContainer } from './RightPanelContainer';
 import { FilesPage } from './FilesPage';
 import { TradingPage } from './TradingPage';
-import { AgentPage, type AgentInfo } from './AgentPage';
+import { AgentPage } from './AgentPage';
+import type { DiscussionThread } from '../../types/discussion';
 import { UsagePage } from './UsagePage';
 import { AboutPage } from './AboutPage';
 import { SchedulePage } from './SchedulePage';
@@ -264,22 +265,29 @@ export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onU
     }
   }, [isTyping, effectiveTaskId]);
 
-  const handleAgentStartChat = (agent: AgentInfo) => {
-    const taskId = onAddTask(`${agent.role} · ${agent.name}`);
+  const handleAgentStartChat = (thread: DiscussionThread) => {
+    const { startRecord } = thread
+    const title = `${startRecord.worker_label} - ${startRecord.worker_name}`
+    const taskId = onAddTask(title)
+    
+    // Create initial message with task context
+    const welcomeMessage = `**任务目标：** ${startRecord.task_objective}\n\n${startRecord.task_context ? '**背景信息：** ' + startRecord.task_context + '\n\n' : ''}您可以继续提问或要求我执行相关操作。`
+    
     setMessagesMap(prev => ({
       ...prev,
       [taskId]: [
         {
           id: `${taskId}-welcome`,
           role: 'assistant',
-          content: `您好，我是${agent.name}，当前担任${agent.role}。我会先帮您快速梳理目标、关键数据和预期产出，再给出可执行建议。您可以直接告诉我想分析的市场、标的、策略，或把相关文件发给我，我会立即开始。`,
+          content: welcomeMessage,
           timestamp: new Date(),
         }
       ]
-    }));
-    onUpdateTaskStatus(taskId, 'idle');
-    handleOpenTab('chat', `${agent.role} · ${agent.name}`, taskId);
-  };
+    }))
+    
+    onUpdateTaskStatus(taskId, 'idle')
+    handleOpenTab('chat', title, taskId)
+  }
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

@@ -1,13 +1,11 @@
 // See https://www.electronjs.org/docs/latest/tutorial/tutorial-preload
-const { contextBridge } = require('electron')
+const { contextBridge, ipcRenderer } = require('electron')
 
 // Expose protected methods that allow the renderer process to use
 // ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
-  // Add any Electron APIs you want to expose to the renderer here
-  // Example:
-  // send: (channel, data) => ipcRenderer.send(channel, data),
-  // receive: (channel, func) => ipcRenderer.on(channel, (event, ...args) => func(...args)),
+  // Discussion file operations
+  getDiscussions: () => ipcRenderer.invoke('discussion:list'),
   
   platform: process.platform,
   versions: {

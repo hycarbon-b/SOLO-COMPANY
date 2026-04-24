@@ -1,15 +1,51 @@
 const { app, BrowserWindow } = require('electron')
 const path = require('path')
+const http = require('http')
+const fs = require('fs')
 
 let mainWindow
 
-function createWindow() {
+const log = fs.createWriteStream('electron-debug.log', { flags: 'a' })
+function debug(...args) {
+  const msg = new Date().toISOString() + ' ' + args.join(' ')
+  log.write(msg + '\n')
+  console.log(msg)
+}
+
+process.on('uncaughtException', (e) => {
+  debug('Uncaught exception:', e.message)
+  console.error(e)
+})
+
+// Check if Vite dev server is running
+function checkDevServer() {
+  return new Promise((resolve) => {
+    debug('Checking Vite at http://localhost:5174...')
+    const req = http.get('http://localhost:5174', (res) => {
+      debug('Vite is running!')
+      resolve(true)
+    })
+    req.on('error', (e) => {
+      debug('Vite check error:', e.message)
+      resolve(false)
+    })
+    req.setTimeout(2000, () => { req.destroy(); debug('Vite timeout'); resolve(false) })
+  })
+}
+
+async function createWindow() {
+  debug('Creating window...')
+  const isDev = await checkDevServer()
+  debug('isDev:', isDev)
+
   // Create the browser window.
+  debug('Creating BrowserWindow...')
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 1024,
     minHeight: 768,
+    show: false, // 延迟显示，等加载完成
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
@@ -17,25 +53,46 @@ function createWindow() {
     },
     title: 'Trading Application',
   })
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show()
+    mainWindow.focus()
+  })
+  debug('BrowserWindow created, isDev=' + isDev)
 
-  // In development, load from Vite dev server
-  if (process.env.NODE_ENV === 'development') {
+  if (isDev) {
+    debug('Loading from Vite dev server...')
     mainWindow.loadURL('http://localhost:5174')
     mainWindow.webContents.openDevTools()
   } else {
-    // In production, load the built files
+    debug('Loading from file...')
     mainWindow.loadFile(path.join(__dirname, '../dist', 'index.html'))
   }
+
+  mainWindow.webContents.on('did-fail-load', (e, code, desc) => {
+    debug('Failed to load:', code, desc)
+  })
 
   mainWindow.on('closed', () => {
     mainWindow = null
   })
-}
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-app.whenReady().then(() => {
-  createWindow()
+  // 捕获控制台消息，记录WS日志
+  const wsLog = fs.createWriteStream('openclaw-gateway-ws.log', { flags: 'a' })
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    if (message.startsWith('[WS ')) {
+      const entry = `[${new Date().toISOString()}] ${message}\n`
+      wsLog.write(entry)
+    }
+  })
+}
+app.whenReady().then(async () => {
+  debug('App ready, calling createWindow...')
+  try {
+    await createWindow()
+    debug('createWindow completed')
+  } catch (e) {
+    debug('createWindow error:', e.message, e.stack)
+  }
 
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
@@ -50,6 +107,79 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
+  }
+})
+
+// Discussion file reading - read from d:\code\temp\discussion\
+const { ipcMain } = require('electron')
+const discussionDir = 'd:\\code\\temp\\discussion'
+
+ipcMain.handle('discussion:list', async () => {
+  try {
+    debug('Reading discussion from:', discussionDir)
+    const files = await fs.promises.readdir(discussionDir)
+    const entries = []
+    
+    for (const file of files) {
+      if (!file.endsWith('.json')) continue
+      try {
+        const content = await fs.promises.readFile(
+          path.join(discussionDir, file), 'utf-8'
+        )
+        const entry = JSON.parse(content)
+        entry._file = file
+        entries.push(entry)
+      } catch (e) {
+        debug('Error reading', file, e.message)
+      }
+    }
+    
+    // Pair start/end records into threads
+    const threads = []
+    const startMap = new Map() // skill_id + task_objective -> start record
+    
+    for (const entry of entries) {
+      const key = entry.skill_id + '|' + entry.task_objective
+      if (entry.event === 'start') {
+        startMap.set(key, entry)
+      } else if (entry.event === 'end') {
+        const startEntry = startMap.get(key)
+        if (startEntry) {
+          threads.push({
+            id: startEntry.timestamp,
+            startRecord: startEntry,
+            endRecord: entry,
+            isActive: false,
+            startTime: new Date(startEntry.timestamp),
+            endTime: new Date(entry.timestamp),
+            duration: new Date(entry.timestamp) - new Date(startEntry.timestamp)
+          })
+          startMap.delete(key)
+        }
+      }
+    }
+    
+    // Add remaining active (start without end)
+    for (const startEntry of startMap.values()) {
+      threads.push({
+        id: startEntry.timestamp,
+        startRecord: startEntry,
+        endRecord: null,
+        isActive: true,
+        startTime: new Date(startEntry.timestamp),
+        endTime: null,
+        duration: null
+      })
+    }
+    
+    // Sort by start time descending
+    threads.sort((a, b) => b.startTime - a.startTime)
+    debug('Found', threads.length, 'discussion threads')
+    
+    return { success: true, discussions: threads, error: null }
+  } catch (e) {
+    debug('Discussion error:', e.message)
+    return { success: false, discussions: [], error: e.message }
   }
 })
 

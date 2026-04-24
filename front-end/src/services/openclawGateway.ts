@@ -4,6 +4,12 @@
  * 从 .env 加载：VITE_OPENCLAW_GATEWAY_URL, VITE_OPENCLAW_GATEWAY_KEY
  */
 
+// ===== WS日志记录 =====
+function logWs(prefix: string, data: unknown) {
+  // 输出到控制台，被main进程捕获并写入openclaw-gateway-ws.log
+  console.log(`[WS ${prefix}]`, JSON.stringify(data))
+}
+
 // ===== 配置 =====
 
 interface GatewayConfig {
@@ -186,6 +192,8 @@ function getWebSocket(): Promise<ExtWebSocket> {
           },
         })
       )
+      const connectMsg = { type: 'req', id: connectRequestId, method: 'connect', params: { minProtocol: 3, maxProtocol: 10, client: { id: 'openclaw-control-ui', version: '1.0.0', platform: 'web', mode: 'webchat' }, role: 'operator', scopes: ['operator.read', 'operator.write', 'operator.admin'], auth: { token } } }
+      logWs('SEND', connectMsg)
     }
 
     rawWs.onmessage = (event) => {
@@ -206,6 +214,7 @@ function getWebSocket(): Promise<ExtWebSocket> {
           try { (window as any).__ocRawListener(data) } catch {}
         }
         handleGatewayMessage(data)
+        logWs('RECV', data)
       } catch (err) {
         console.error('[Gateway] Parse error:', err)
       }
@@ -266,6 +275,7 @@ export async function callOpenClawGateway(
         params: { message, sessionKey, idempotencyKey: id },
       })
     )
+    logWs('SEND', { type: 'req', id, method: 'chat.send', params: { message, sessionKey, idempotencyKey: id } })
   })
 }
 

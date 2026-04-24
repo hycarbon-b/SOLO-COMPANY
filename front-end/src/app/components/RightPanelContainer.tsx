@@ -1,6 +1,8 @@
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { FileText, Image, Table, MoreVertical, Trash2, Eye, RefreshCw } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { useState, useEffect, useRef } from 'react';
+import type { DiscussionThread } from '../../types/discussion';
 
 interface FileItem {
   id: string;
@@ -13,9 +15,10 @@ interface FileItem {
 
 interface RightPanelContainerProps {
   onMessageSent?: number;
+  discussions?: DiscussionThread[];
 }
 
-export function RightPanelContainer({ onMessageSent }: RightPanelContainerProps) {
+export function RightPanelContainer({ onMessageSent, discussions }: RightPanelContainerProps) {
   const [files, setFiles] = useState<FileItem[]>([
     { id: '1', name: '股票分析报告.pdf', type: 'document', size: '2.3 MB', date: '2小时前', content: '# 股票分析报告\n\n## 市场概况\n\n本报告分析了当前市场的整体情况...' },
     { id: '2', name: '市场趋势图.png', type: 'image', size: '456 KB', date: '3小时前' },
@@ -31,6 +34,9 @@ export function RightPanelContainer({ onMessageSent }: RightPanelContainerProps)
     direction: 'left' | 'right';
   }>>([]);
   const agentMessagesEndRef = useRef<HTMLDivElement>(null);
+  const lastDiscussionsRef = useRef<DiscussionThread[]>([]);
+    const lastUpdateRef = useRef<number>(Date.now()); // 从用户进入时开始记录
+    const polledRef = useRef<boolean>(false); // 标记是否已轮询过
 
   const agentAvatars: { [key: string]: { bg: string; initial: string } } = {
     '数据分析师': { bg: 'bg-gradient-to-br from-blue-400 to-blue-600', initial: '数' },
@@ -63,47 +69,82 @@ export function RightPanelContainer({ onMessageSent }: RightPanelContainerProps)
   };
 
   useEffect(() => {
-    if (onMessageSent && onMessageSent > 0) {
-      // 清空之前的消息
-      setAgentMessages([]);
-
-      // 模拟 Agent 依次工作
-      const agentSequence = [
-        { agent: '数据分析师', message: '正在采集和分析最新市场数据...', delay: 500, direction: 'left' as const },
-        { agent: '数据分析师', message: '数据采集完成，发现科技板块整体上涨2.3%，成交量放大明显', delay: 2000, direction: 'left' as const },
-        { agent: '新闻分析师', message: '开始分析最新财经新闻...', delay: 3500, direction: 'right' as const },
-        { agent: '新闻分析师', message: '新闻分析完成，央行释放积极的货币政策信号，市场情绪偏乐观', delay: 5500, direction: 'right' as const },
-        { agent: '行情解读员', message: '正在综合数据和新闻进行行情研判...', delay: 7000, direction: 'left' as const },
-        { agent: '行情解读员', message: '结合技术面和基本面，建议关注芯片和新能源板块龙头股', delay: 9000, direction: 'left' as const },
-        { agent: '策略顾问', message: '正在生成交易策略...', delay: 10500, direction: 'right' as const },
-        { agent: '策略顾问', message: '策略生成完成，建议采用双均线+MACD组合指标，设置止损位-8%', delay: 12500, direction: 'right' as const },
-      ];
-
-      const timeouts: NodeJS.Timeout[] = [];
-
-      agentSequence.forEach((item, index) => {
-        const timeout = setTimeout(() => {
-          const now = new Date();
-          const timeStr = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
-
-          setAgentMessages(prev => [...prev, {
-            id: `msg-${Date.now()}-${index}`,
-            agent: item.agent,
-            message: item.message,
-            time: timeStr,
-            direction: item.direction,
-          }]);
-        }, item.delay);
-
-        timeouts.push(timeout);
-      });
-
-      // 清理函数
-      return () => {
-        timeouts.forEach(timeout => clearTimeout(timeout));
-      };
-    }
   }, [onMessageSent]);
+
+  // 从 IPC 获取真实 discussion 数据
+  useEffect(() => {
+    const fetchDiscussions = async () => {
+      try {
+        const result = await window.electronAPI.getDiscussions();
+        if (result.success && result.discussions) {
+          const latestTime = lastUpdateRef.current;
+          const allThreads = result.discussions; // 保存所有线程
+          const now = Date.now();
+          // 过滤出用户进入后新产生的线程
+          const newThreads = allThreads.filter(d => {
+            const threadTime = new Date(d.startTime).getTime();
+            return threadTime > latestTime && threadTime <= now;
+          });
+          
+          if (newThreads.length > 0) {
+            // 更新时间戳，但只针对新线程
+            for (const thread of newThreads) {
+              const threadTime = new Date(thread.startTime).getTime();
+              if (threadTime > lastUpdateRef.current) {
+                lastUpdateRef.current = threadTime;
+              }
+            }
+            lastDiscussionsRef.current = allThreads;
+            
+            const newMessages: Array<{
+              id: string;
+              agent: string;
+              message: string;
+              time: string;
+              direction: 'left' | 'right';
+            }> = [];
+            
+            for (const thread of newThreads) {
+              const { startRecord } = thread;
+              const agent = startRecord.worker_label || startRecord.worker_name;
+              
+              newMessages.push({
+                id: `${thread.id}-start`,
+                agent: agent,
+                message: `开始: ${startRecord.task_objective}`,
+                time: new Date(startRecord.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+                direction: 'left',
+              });
+              
+              if (thread.endRecord) {
+                const status = thread.endRecord.status === 'success' ? '✓' : 
+                              thread.endRecord.status === 'failed' ? '✗' : '~';
+                newMessages.push({
+                  id: `${thread.id}-end`,
+                  agent: agent,
+                  message: `${status} ${thread.endRecord.summary || ''}`,
+                  time: new Date(thread.endRecord.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+                  direction: 'right',
+                });
+              }
+            }
+            
+            setAgentMessages(prev => [...prev, ...newMessages].slice(-50));
+          }
+        }
+      } catch (e) {
+        console.error('Fetch discussions error:', e);
+      }
+    };
+    
+    // 初始获取
+    fetchDiscussions();
+    
+    // 每5秒轮询
+    const interval = setInterval(fetchDiscussions, 5000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   // 自动滚动到最新消息
   useEffect(() => {
@@ -250,7 +291,7 @@ export function RightPanelContainer({ onMessageSent }: RightPanelContainerProps)
                                 ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-tr-md'
                                 : 'bg-white border border-gray-100 text-gray-900 rounded-tl-md'
                             }`}>
-                              <div className="text-xs leading-relaxed">{msg.message}</div>
+                              <div className="text-xs leading-relaxed prose prose-xs max-w-none"><ReactMarkdown>{msg.message}</ReactMarkdown></div>
                             </div>
                             <div className={`text-xs text-gray-400 mt-1.5 ${msg.direction === 'right' ? 'text-right' : 'text-left'}`}>
                               {msg.time}
