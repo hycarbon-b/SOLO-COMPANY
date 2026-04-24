@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require('electron')
+const { app, BrowserWindow, ipcMain } = require('electron')
 const path = require('path')
 const http = require('http')
 const fs = require('fs')
@@ -75,43 +75,19 @@ async function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null
   })
-
-  // 捕获控制台消息，记录WS日志
-  const wsLog = fs.createWriteStream('openclaw-gateway-ws.log', { flags: 'a' })
-  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
-    if (message.startsWith('[WS ')) {
-      const entry = `[${new Date().toISOString()}] ${message}\n`
-      wsLog.write(entry)
-    }
-  })
 }
-app.whenReady().then(async () => {
-  debug('App ready, calling createWindow...')
-  try {
-    await createWindow()
-    debug('createWindow completed')
-  } catch (e) {
-    debug('createWindow error:', e.message, e.stack)
-  }
 
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow()
-    }
-  })
+// WS 日志 WriteStream
+const wsLog = fs.createWriteStream('openclaw-gateway-ws.log', { flags: 'a', highWaterMark: 64 * 1024 })
+
+// IPC handler: WS 日志写入
+ipcMain.handle('ws-log', async (event, { prefix, data }) => {
+  const entry = `[${new Date().toISOString()}] [WS ${prefix}] ${JSON.stringify(data)}\n`
+  wsLog.write(entry)
+  wsLog.flush()
 })
 
-// Quit when all windows are closed, except on macOS.
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-  }
-})
-
-// Discussion file reading - read from d:\code\temp\discussion\
-const { ipcMain } = require('electron')
+// Discussion file reading - read from d:\code\temp\discussion
 const discussionDir = 'd:\\code\\temp\\discussion'
 
 ipcMain.handle('discussion:list', async () => {
@@ -139,49 +115,64 @@ ipcMain.handle('discussion:list', async () => {
     const startMap = new Map() // skill_id + task_objective -> start record
     
     for (const entry of entries) {
-      const key = entry.skill_id + '|' + entry.task_objective
-      if (entry.event === 'start') {
+      const key = entry.skill_id + '|' + (entry.task_objective || '')
+      if (entry.event === 'discussion_start') {
         startMap.set(key, entry)
-      } else if (entry.event === 'end') {
-        const startEntry = startMap.get(key)
-        if (startEntry) {
-          threads.push({
-            id: startEntry.timestamp,
-            startRecord: startEntry,
-            endRecord: entry,
-            isActive: false,
-            startTime: new Date(startEntry.timestamp),
-            endTime: new Date(entry.timestamp),
-            duration: new Date(entry.timestamp) - new Date(startEntry.timestamp)
-          })
-          startMap.delete(key)
-        }
+      } else if (entry.event === 'discussion_end' && startMap.has(key)) {
+        const start = startMap.get(key)
+        threads.push({
+          skill_id: entry.skill_id,
+          task_objective: entry.task_objective,
+          start_time: start.timestamp,
+          end_time: entry.timestamp,
+          start,
+          end: entry,
+        })
+        startMap.delete(key)
       }
     }
     
-    // Add remaining active (start without end)
-    for (const startEntry of startMap.values()) {
+    // Add unpaired starts as incomplete
+    for (const [, start] of startMap) {
       threads.push({
-        id: startEntry.timestamp,
-        startRecord: startEntry,
-        endRecord: null,
-        isActive: true,
-        startTime: new Date(startEntry.timestamp),
-        endTime: null,
-        duration: null
+        skill_id: start.skill_id,
+        task_objective: start.task_objective,
+        start_time: start.timestamp,
+        end_time: null,
+        start,
+        end: null,
       })
     }
     
-    // Sort by start time descending
-    threads.sort((a, b) => b.startTime - a.startTime)
     debug('Found', threads.length, 'discussion threads')
-    
-    return { success: true, discussions: threads, error: null }
+    return { success: true, discussions: threads }
   } catch (e) {
-    debug('Discussion error:', e.message)
-    return { success: false, discussions: [], error: e.message }
+    debug('Error listing discussions:', e.message)
+    return { success: false, error: e.message }
   }
 })
 
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and import them here.
+app.whenReady().then(async () => {
+  debug('App ready, calling createWindow...')
+  try {
+    await createWindow()
+    debug('createWindow completed')
+  } catch (e) {
+    debug('createWindow error:', e.message, e.stack)
+  }
+
+  // On OS X it's common to re-create a window in the app when the
+  // dock icon is clicked and there are no other windows open.
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow()
+    }
+  })
+})
+
+// Quit when all windows are closed, except on macOS.
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit()
+  }
+})

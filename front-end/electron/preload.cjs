@@ -13,4 +13,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     chrome: process.versions.chrome,
     electron: process.versions.electron,
   }
+    // WS日志写入
+    wsLog: (prefix, data) => ipcRenderer.invoke('ws-log', { prefix, data }),
 })

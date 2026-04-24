@@ -5,7 +5,7 @@
 | 页面文件 | 组件名 | 功能描述 |
 |---------|--------|----------|
 | `app/components/AboutPage.tsx` | `AboutPage` | 系统信息页面，显示OS版本、硬件信息、设备码、Google认证码 |
-| `app/components/AgentPage.tsx` | `AgentPage` | **Agent工作状态页面**，显示discussion列表，可点击进入对话 |
+| `app/components/AgentPage.tsx` | `AgentPage` | Agent列表 |
 | `app/components/FilesPage.tsx` | `FilesPage` | 文件库页面，分类显示文档/表格/图片/视频/策略代码 |
 | `app/components/TradingPage.tsx` | `TradingPage` | 交易页面，模拟盘/实盘交易记录 |
 | `app/components/MarketPage.tsx` | `MarketPage` | 市场页面，行情图表显示 |
