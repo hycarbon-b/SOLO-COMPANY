@@ -1,8 +1,9 @@
 import {
   Paperclip, Mic, ArrowUp, Target, TrendingUp, Activity, Cpu, X, FileText,
-  Image as ImageIcon, HardDrive, Upload, Table, Plus, Home
+  Image as ImageIcon, HardDrive, Upload, Table, Plus, Home, Globe
 } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback } from 'react';
+import * as React from 'react';
 import { callOpenClawGateway } from '../../services/openclawGateway';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { ChatPanel } from './ChatPanel';
@@ -21,13 +22,14 @@ import { StrategyCard } from './StrategyCard';
 
 
 // === Tab Types ===
-type TabType = 'home' | 'files' | 'trading' | 'market' | 'agent' | 'schedule' | 'usage' | 'about' | 'chat';
+type TabType = 'home' | 'files' | 'trading' | 'market' | 'agent' | 'schedule' | 'usage' | 'about' | 'chat' | 'web';
 
 interface Tab {
   id: string;           // unique tab id
   type: TabType;
   title: string;
   taskId?: string;      // for chat tabs
+  url?: string;         // for web tabs
   icon?: React.ReactNode;
 }
 
@@ -51,6 +53,7 @@ const TAB_ICONS: Record<TabType, React.ReactNode> = {
   usage: <HardDrive className="w-3.5 h-3.5 flex-shrink-0" />,
   about: <FileText className="w-3.5 h-3.5 flex-shrink-0" />,
   chat: <Target className="w-3.5 h-3.5 flex-shrink-0" />,
+  web: <Globe className="w-3.5 h-3.5 flex-shrink-0" />,
 };
 
 // === TabBar Component ===
@@ -128,15 +131,27 @@ export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onU
 
   // === Sidebar interaction → open/switch tab ===
   // This replaces direct selectedMenu navigation with tab-based navigation
-  const handleOpenTab = (type: TabType, title: string, taskId?: string) => {
+  const handleOpenTab = (type: TabType, title: string, taskId?: string, url?: string) => {
     // For chat tabs, key by taskId so the same task reuses the tab
-    const tabKey = type === 'chat' && taskId ? `chat-${taskId}` : type;
+    // For web tabs, key by url so the same page reuses the tab
+    const tabKey =
+      type === 'chat' && taskId
+        ? `chat-${taskId}`
+        : type === 'web' && url
+          ? `web-${url}`
+          : type;
 
-    const existing = tabs.find(t => (type === 'chat' && taskId ? t.taskId === taskId : t.type === type));
+    const existing = tabs.find(t =>
+      type === 'chat' && taskId
+        ? t.taskId === taskId
+        : type === 'web' && url
+          ? t.type === 'web' && t.url === url
+          : t.type === type
+    );
     if (existing) {
       setActiveTabId(existing.id);
     } else {
-      const newTab: Tab = { id: tabKey, type, title, taskId };
+      const newTab: Tab = { id: tabKey, type, title, taskId, url };
       setTabs(prev => [...prev, newTab]);
       setActiveTabId(tabKey);
     }
@@ -161,13 +176,31 @@ export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onU
   // We'll use a global event approach via window
   useEffect(() => {
     const handler = (e: Event) => {
-      const detail = (e as CustomEvent<{ tabType: TabType; title: string; taskId?: string }>).detail;
-      // event type is 'workbuddy:open-tab'; detail contains { tabType, title, taskId }
-      handleOpenTab(detail.tabType, detail.title, detail.taskId);
+      const detail = (e as CustomEvent<{ tabType: TabType; title: string; taskId?: string; url?: string }>).detail;
+      // event type is 'workbuddy:open-tab'; detail contains { tabType, title, taskId, url }
+      handleOpenTab(detail.tabType, detail.title, detail.taskId, detail.url);
     };
     window.addEventListener('workbuddy:open-tab', handler);
     return () => window.removeEventListener('workbuddy:open-tab', handler);
   }, [tabs, activeTabId]);
+
+  // 监听 Electron 主进程通过 HTTP 发来的"打开网页 Tab"请求
+  useEffect(() => {
+    const api = (window as any).electronAPI;
+    if (!api?.onOpenWebTab) return;
+    const off = api.onOpenWebTab((data: { url: string }) => {
+      if (!data?.url) return;
+      let title = data.url;
+      try {
+        const u = new URL(data.url);
+        title = u.host + (u.pathname && u.pathname !== '/' ? u.pathname : '');
+      } catch { /* keep raw */ }
+      window.dispatchEvent(new CustomEvent('workbuddy:open-tab', {
+        detail: { tabType: 'web', title, url: data.url },
+      }));
+    });
+    return () => { if (typeof off === 'function') off(); };
+  }, []);
 
   // === Chat State (same as before) ===
   const [inputValue, setInputValue] = useState('');
@@ -232,6 +265,31 @@ export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onU
     handleOpenTab('chat', title, taskId)
   }
 
+    // 当RightPanel检测到Agent线程完成时，在新标签页中展示结果
+    const handleAgentTaskComplete = useCallback((thread: DiscussionThread) => {
+      const { startRecord, endRecord } = thread
+      const title = `${startRecord.worker_label} - ${startRecord.worker_name}`
+      const taskId = onAddTask(title)
+
+      const summary = endRecord?.summary || startRecord.task_objective || ''
+      const welcomeMessage = `**任务目标：** ${startRecord.task_objective}\n\n${startRecord.task_context ? '**背景信息：** ' + startRecord.task_context + '\n\n' : ''}${summary ? '**完成总结：** ' + summary + '\n\n' : ''}您可以继续提问或要求我执行相关操作。`
+
+      setMessagesMap(prev => ({
+        ...prev,
+        [taskId]: [
+          {
+            id: `${taskId}-welcome`,
+            role: 'assistant',
+            content: welcomeMessage,
+            timestamp: new Date(),
+          }
+        ]
+      }))
+
+      onUpdateTaskStatus(taskId, 'idle')
+      handleOpenTab('chat', title, taskId)
+    }, [onAddTask, onUpdateTaskStatus, handleOpenTab])
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -277,6 +335,8 @@ export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onU
 
     // 创建一个唯一的助手消息ID用于流式更新
     const assistantMsgId = `${Date.now()}-assistant-${Math.random().toString(36).slice(2, 9)}`;
+    // 当前正在流式更新的气泡 ID（会随新分段事件变化）
+    let currentAsstMsgId = assistantMsgId;
     if (taskIdToUse) {
       setMessagesMap(prev => {
         const currentMessages = prev[taskIdToUse!] || [];
@@ -293,37 +353,55 @@ export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onU
     try {
       const { text } = await callOpenClawGateway(
         userContent,
-        (_chunk, accumulated) => {
-          // 每次收到新内容，更新助手消息
-          if (taskIdToUse) {
+        (_chunk, accumulated, isNewSegment) => {
+          if (!taskIdToUse) return;
+
+          // 当 Gateway 开始一个新的流式分段时，把当前气泡定格，
+          // 并为新的分段创建一个全新的助手气泡。
+          if (isNewSegment) {
+            const newMsgId = `${Date.now()}-assistant-${Math.random().toString(36).slice(2, 9)}`;
+            currentAsstMsgId = newMsgId;
             setMessagesMap(prev => {
               const msgs = prev[taskIdToUse!] || [];
-              const messageIndex = msgs.findIndex(m => m.id === assistantMsgId);
-              
-              // 如果找不到消息，说明可能被意外清除了，重新添加
-              if (messageIndex === -1) {
-                console.warn('[Chat] Assistant message not found, re-adding:', assistantMsgId);
-                return {
-                  ...prev,
-                  [taskIdToUse!]: [
-                    ...msgs,
-                    { id: assistantMsgId, role: 'assistant', content: accumulated, timestamp: new Date() },
-                  ],
-                };
-              }
-              
-              // 正常更新现有消息
-              const updatedMessages = [...msgs];
-              updatedMessages[messageIndex] = {
-                ...updatedMessages[messageIndex],
-                content: accumulated,
-              };
               return {
                 ...prev,
-                [taskIdToUse!]: updatedMessages,
+                [taskIdToUse!]: [
+                  ...msgs,
+                  { id: newMsgId, role: 'assistant', content: accumulated, timestamp: new Date() },
+                ],
               };
             });
+            return;
           }
+
+          // 每次收到新内容，更新当前助手气泡
+          setMessagesMap(prev => {
+            const msgs = prev[taskIdToUse!] || [];
+            const messageIndex = msgs.findIndex(m => m.id === currentAsstMsgId);
+
+            // 如果找不到消息，说明可能被意外清除了，重新添加
+            if (messageIndex === -1) {
+              console.warn('[Chat] Assistant message not found, re-adding:', currentAsstMsgId);
+              return {
+                ...prev,
+                [taskIdToUse!]: [
+                  ...msgs,
+                  { id: currentAsstMsgId, role: 'assistant', content: accumulated, timestamp: new Date() },
+                ],
+              };
+            }
+
+            // 正常更新现有消息
+            const updatedMessages = [...msgs];
+            updatedMessages[messageIndex] = {
+              ...updatedMessages[messageIndex],
+              content: accumulated,
+            };
+            return {
+              ...prev,
+              [taskIdToUse!]: updatedMessages,
+            };
+          });
         }
       );
 
@@ -331,26 +409,28 @@ export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onU
       if (taskIdToUse) {
         setMessagesMap(prev => {
           const msgs = prev[taskIdToUse!] || [];
-          const messageIndex = msgs.findIndex(m => m.id === assistantMsgId);
-          
+          const messageIndex = msgs.findIndex(m => m.id === currentAsstMsgId);
+
           if (messageIndex !== -1) {
             const updatedMessages = [...msgs];
+            const existing = updatedMessages[messageIndex];
+            // 只有当当前气泡还没有内容时才使用 text 兜底，避免覆盖已经流式写入的分段内容
             updatedMessages[messageIndex] = {
-              ...updatedMessages[messageIndex],
-              content: text || updatedMessages[messageIndex].content,
+              ...existing,
+              content: existing.content || text || '',
             };
             return {
               ...prev,
               [taskIdToUse!]: updatedMessages,
             };
           }
-          
+
           // 如果消息不存在，添加新消息
           return {
             ...prev,
             [taskIdToUse!]: [
               ...msgs,
-              { id: assistantMsgId, role: 'assistant', content: text || '', timestamp: new Date() },
+              { id: currentAsstMsgId, role: 'assistant', content: text || '', timestamp: new Date() },
             ],
           };
         });
@@ -361,26 +441,32 @@ export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onU
       if (taskIdToUse) {
         setMessagesMap(prev => {
           const msgs = prev[taskIdToUse!] || [];
-          const messageIndex = msgs.findIndex(m => m.id === assistantMsgId);
-          
+          const messageIndex = msgs.findIndex(m => m.id === currentAsstMsgId);
+
           if (messageIndex !== -1) {
             const updatedMessages = [...msgs];
+            const existing = updatedMessages[messageIndex];
+            // 保留已经流式生成的内容，仅在末尾追加中断提示；
+            // 如果气泡完全为空，则直接显示错误信息。
+            const preservedContent = existing.content
+              ? `${existing.content}\n\n${errorText}`
+              : errorText;
             updatedMessages[messageIndex] = {
-              ...updatedMessages[messageIndex],
-              content: errorText,
+              ...existing,
+              content: preservedContent,
             };
             return {
               ...prev,
               [taskIdToUse!]: updatedMessages,
             };
           }
-          
+
           // 如果消息不存在，添加错误消息
           return {
             ...prev,
             [taskIdToUse!]: [
               ...msgs,
-              { id: assistantMsgId, role: 'assistant', content: errorText, timestamp: new Date() },
+              { id: currentAsstMsgId, role: 'assistant', content: errorText, timestamp: new Date() },
             ],
           };
         });
@@ -448,6 +534,8 @@ export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onU
         return <AboutPage />;
       case 'chat':
         return renderChatContent(tab.taskId ?? null);
+      case 'web':
+        return renderWebContent(tab.url ?? '');
       default:
         return renderHomeContent();
     }
@@ -551,10 +639,34 @@ export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onU
     </main>
   );
 
+  const renderWebContent = (url: string) => {
+    if (!url) {
+      return (
+        <main className="h-full flex items-center justify-center bg-white text-gray-500">
+          未提供网址
+        </main>
+      );
+    }
+    return (
+      <main className="h-full flex flex-col bg-white">
+        <div className="px-4 py-2 border-b border-gray-100 text-xs text-gray-500 truncate" title={url}>
+          {url}
+        </div>
+        <div className="flex-1 overflow-hidden">
+          {/* Electron webview 标签用于嵌入外部网页 */}
+          {React.createElement('webview', {
+            src: url,
+            style: { width: '100%', height: '100%', display: 'inline-flex' },
+            allowpopups: 'true',
+          })}
+        </div>
+      </main>
+    );
+  };
+
   const renderChatContent = (taskId: string | null) => {
     const chatMessages = taskId ? (messagesMap[taskId] || []) : [];
-    const chatTask = tasks.find(t => t.id === taskId);
-    return (
+    const chatTask = tasks.find(t => t.id === taskId);    return (
       <main className="h-full flex overflow-hidden bg-white">
         <PanelGroup direction="horizontal" className="flex-1">
           <Panel defaultSize={75} minSize={50}>
@@ -570,7 +682,7 @@ export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onU
             />
           </Panel>
           <PanelResizeHandle className="w-1 bg-gray-200 hover:bg-blue-400 transition-colors cursor-col-resize" />
-          <RightPanelContainer onMessageSent={messageSentTrigger} />
+          <RightPanelContainer onMessageSent={messageSentTrigger} onAgentTaskComplete={handleAgentTaskComplete} />
         </PanelGroup>
         {showFileLibrary && renderFileLibraryModal()}
       </main>

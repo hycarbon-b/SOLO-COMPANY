@@ -1,0 +1,139 @@
+{
+  "stocks": [
+    {
+      "name": "陕西煤业",
+      "code": "601225.SH",
+      "price": "26.30",
+      "changeVal": "+1.91",
+      "changePct": "7.26",
+      "trend": "bull",
+      "tag": "技术面强势",
+      "stats": [
+        {
+          "label": "买入区间",
+          "value": "25.77–26.83"
+        },
+        {
+          "label": "止损位",
+          "value": "24.19"
+        },
+        {
+          "label": "目标位",
+          "value": "28.40"
+        },
+        {
+          "label": "选股理由",
+          "value": "MACD金叉 + RSI强势"
+        }
+      ]
+    },
+    {
+      "name": "爱尔眼科",
+      "code": "300015.SZ",
+      "price": "10.99",
+      "changeVal": "+1.50",
+      "changePct": "13.65",
+      "trend": "bull",
+      "tag": "技术面强势",
+      "stats": [
+        {
+          "label": "买入区间",
+          "value": "10.77–11.21"
+        },
+        {
+          "label": "止损位",
+          "value": "9.23"
+        },
+        {
+          "label": "目标位",
+          "value": "11.87"
+        },
+        {
+          "label": "选股理由",
+          "value": "量能释放"
+        }
+      ]
+    },
+    {
+      "name": "立讯精密",
+      "code": "002475.SZ",
+      "price": "66.00",
+      "changeVal": "+0.27",
+      "changePct": "0.41",
+      "trend": "bull",
+      "tag": "技术面强势",
+      "stats": [
+        {
+          "label": "买入区间",
+          "value": "64.68–67.32"
+        },
+        {
+          "label": "止损位",
+          "value": "54.23"
+        },
+        {
+          "label": "目标位",
+          "value": "71.28"
+        },
+        {
+          "label": "选股理由",
+          "value": "均线多头"
+        }
+      ]
+    },
+    {
+      "name": "601398",
+      "code": "601398.SH",
+      "price": "7.58",
+      "changeVal": "+0.01",
+      "changePct": "0.13",
+      "trend": "bull",
+      "tag": "技术面强势",
+      "stats": [
+        {
+          "label": "买入区间",
+          "value": "7.43–7.73"
+        },
+        {
+          "label": "止损位",
+          "value": "7.11"
+        },
+        {
+          "label": "目标位",
+          "value": "8.19"
+        },
+        {
+          "label": "选股理由",
+          "value": "均线多头 + RSI强势"
+        }
+      ]
+    },
+    {
+      "name": "海康威视",
+      "code": "002415.SZ",
+      "price": "33.60",
+      "changeVal": "-0.89",
+      "changePct": "2.64",
+      "trend": "bear",
+      "tag": "技术面强势",
+      "stats": [
+        {
+          "label": "买入区间",
+          "value": "32.93–34.27"
+        },
+        {
+          "label": "止损位",
+          "value": "30.46"
+        },
+        {
+          "label": "目标位",
+          "value": "36.29"
+        },
+        {
+          "label": "选股理由",
+          "value": "均线多头 + RSI强势"
+        }
+      ]
+    }
+  ]
+}

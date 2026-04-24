@@ -27,4 +27,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   // WS日志写入
   wsLog: (prefix, data) => ipcRenderer.invoke('ws-log', { prefix, data }),
+
+  // 外部 HTTP 请求打开网页 Tab
+  onOpenWebTab: (callback) => {
+    const handler = (_event, data) => callback(data)
+    ipcRenderer.on('open-web-tab', handler)
+    return () => ipcRenderer.removeListener('open-web-tab', handler)
+  },
 });

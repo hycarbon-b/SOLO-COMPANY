@@ -1,0 +1,53 @@
+[
+  {
+    "skill_id": "employee_cto",
+    "worker_label": "CTO · 首席技术官",
+    "worker_name": "David Zhang",
+    "role": "CTO",
+    "name_zh": "张大卫",
+    "color": "blue",
+    "description": "软件架构、技术选型与可行性评估专家",
+    "avatar_file": "CTO · 首席技术官.png",
+    "intro_phrases": [
+      "专注于系统架构设计与技术战略",
+      "评估技术可行性与开发周期",
+      "发现代码安全漏洞与性能瓶颈",
+      "规划 CI/CD、DevOps 与云架构",
+      "API 设计、数据库建模与扩展模式"
+    ]
+  },
+  {
+    "skill_id": "employee_cfo",
+    "worker_label": "CFO · 首席财务官",
+    "worker_name": "Kevin Li",
+    "role": "CFO",
+    "name_zh": "李凯文",
+    "color": "emerald",
+    "description": "财务规划、ROI 分析与投资评估专家",
+    "avatar_file": "CFO · 首席财务官.png",
+    "intro_phrases": [
+      "精通财务规划与预算管理",
+      "ROI、NPV 与 IRR 定量分析",
+      "评估定价策略与单位经济学",
+      "识别并量化财务风险",
+      "融资策略与投资者指标分析"
+    ]
+  },
+  {
+    "skill_id": "employee_cpo",
+    "worker_label": "CPO · 首席产品官",
+    "worker_name": "Lisa Wang",
+    "role": "CPO",
+    "name_zh": "王丽莎",
+    "color": "violet",
+    "description": "产品路线图规划、用户需求分析与功能优先级专家",
+    "avatar_file": "CPO · 首席产品官.png",
+    "intro_phrases": [
+      "定义产品路线图与功能优先级",
+      "运用 RICE、JTBD 框架分析用户需求",
+      "制定产品需求文档与 UX 策略",
+      "评估产品市场契合度",
+      "竞品分析与差异化策略"
+    ]
+  }
+]

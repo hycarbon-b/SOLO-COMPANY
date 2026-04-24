@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Analysis Report</title>
+    <style>
+        body { margin: 0; padding: 20px; background: #f5f5f5; font-family: -apple-system, Roboto, sans-serif; }
+        .report-header { margin-bottom: 20px; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .report-title { font-size: 24px; font-weight: 700; color: #131722; margin: 0 0 5px 0; }
+        .report-time { font-size: 12px; color: #707584; }
+        :root { --bg-color: #ffffff; --text-main: #131722; --text-sub: #707584; --bull-color: #f23645; --bear-color: #089981; --border-color: #f0f3fa; }
+        .stocks-container { display: flex; flex-wrap: wrap; gap: 15px; max-width: 1200px; }
+        .tv-card-container { width: 220px; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .tv-card-container:hover { transform: translateY(-4px); transition: transform 0.2s; }
+        .tv-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .symbol { font-size: 18px; font-weight: 800; }
+        .exchange { font-size: 11px; color: var(--text-sub); }
+        .sector-tag { font-size: 11px; background: var(--border-color); padding: 2px 8px; border-radius: 4px; color: var(--text-sub); }
+        .tv-price-row { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+        .current-price { font-size: 24px; font-weight: 700; }
+        .change-wrapper { font-size: 14px; font-weight: 600; display: flex; gap: 4px; }
+        .change-wrapper.bull { color: var(--bull-color); }
+        .change-wrapper.bear { color: var(--bear-color); }
+        .tv-divider { border: 0; border-top: 1px solid var(--border-color); margin: 8px 0; }
+        .tv-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .stat-item { display: flex; flex-direction: column; }
+        .stat-item .label { font-size: 11px; color: var(--text-sub); margin-bottom: 2px; }
+        .stat-item .value { font-size: 13px; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="report-header">
+        <h1 class="report-title">Stock Analysis Report</h1>
+        <div class="report-time">Generated: 2026-04-21 18:55:21</div>
+    </div>
+    <div class="stocks-container">
+    <div class="tv-card-container">
+        <div class="tv-header">
+            <div class="symbol-section">
+                <span class="symbol">贵州茅台</span>
+                <span class="exchange">600519.SH</span>
+            </div>
+            <div class="sector-tag">价值白马</div>
+        </div>
+        <div class="tv-price-row">
+            <span class="current-price">1682.50</span>
+            <div class="change-wrapper bull">
+                <span>+15.20</span>
+                <span>(0.91%)</span>
+            </div>
+        </div>
+        <hr class="tv-divider" />
+        <div class="tv-stats-grid"><div class="stat-item"><span class="label">市盈率</span><span class="value">29.4</span></div><div class="stat-item"><span class="label">总市值</span><span class="value">2.11万亿</span></div><div class="stat-item"><span class="label">换手</span><span class="value">0.15%</span></div><div class="stat-item"><span class="label">成交额</span><span class="value">25.8亿</span></div></div>
+    </div>
+    <div class="tv-card-container">
+        <div class="tv-header">
+            <div class="symbol-section">
+                <span class="symbol">宁德时代</span>
+                <span class="exchange">300750.SZ</span>
+            </div>
+            <div class="sector-tag">新能源龙头</div>
+        </div>
+        <div class="tv-price-row">
+            <span class="current-price">188.12</span>
+            <div class="change-wrapper bear">
+                <span>-3.45</span>
+                <span>(1.80%)</span>
+            </div>
+        </div>
+        <hr class="tv-divider" />
+        <div class="tv-stats-grid"><div class="stat-item"><span class="label">市盈率</span><span class="value">18.2</span></div><div class="stat-item"><span class="label">总市值</span><span class="value">8276亿</span></div><div class="stat-item"><span class="label">换手</span><span class="value">0.88%</span></div><div class="stat-item"><span class="label">成交额</span><span class="value">42.1亿</span></div></div>
+    </div>
+    <div class="tv-card-container">
+        <div class="tv-header">
+            <div class="symbol-section">
+                <span class="symbol">中际旭创</span>
+                <span class="exchange">300308.SZ</span>
+            </div>
+            <div class="sector-tag">CPO/算力</div>
+        </div>
+        <div class="tv-price-row">
+            <span class="current-price">156.40</span>
+            <div class="change-wrapper bull">
+                <span>+7.32</span>
+                <span>(4.91%)</span>
+            </div>
+        </div>
+        <hr class="tv-divider" />
+        <div class="tv-stats-grid"><div class="stat-item"><span class="label">市盈率</span><span class="value">65.1</span></div><div class="stat-item"><span class="label">总市值</span><span class="value">1255亿</span></div><div class="stat-item"><span class="label">换手</span><span class="value">3.42%</span></div><div class="stat-item"><span class="label">成交额</span><span class="value">15.4亿</span></div></div>
+    </div></div>
+</body>
+</html>

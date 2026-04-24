@@ -1,0 +1,49 @@
+{
+  "stocks": [
+    {
+      "name": "贵州茅台",
+      "code": "600519.SH",
+      "price": "1682.50",
+      "changeVal": "+15.20",
+      "changePct": "0.91",
+      "trend": "bull",
+      "tag": "价值白马",
+      "stats": [
+        {"label": "市盈率", "value": "29.4"},
+        {"label": "总市值", "value": "2.11万亿"},
+        {"label": "换手", "value": "0.15%"},
+        {"label": "成交额", "value": "25.8亿"}
+      ]
+    },
+    {
+      "name": "宁德时代",
+      "code": "300750.SZ",
+      "price": "188.12",
+      "changeVal": "-3.45",
+      "changePct": "1.80",
+      "trend": "bear",
+      "tag": "新能源龙头",
+      "stats": [
+        {"label": "市盈率", "value": "18.2"},
+        {"label": "总市值", "value": "8276亿"},
+        {"label": "换手", "value": "0.88%"},
+        {"label": "成交额", "value": "42.1亿"}
+      ]
+    },
+    {
+      "name": "中际旭创",
+      "code": "300308.SZ",
+      "price": "156.40",
+      "changeVal": "+7.32",
+      "changePct": "4.91",
+      "trend": "bull",
+      "tag": "CPO/算力",
+      "stats": [
+        {"label": "市盈率", "value": "65.1"},
+        {"label": "总市值", "value": "1255亿"},
+        {"label": "换手", "value": "3.42%"},
+        {"label": "成交额", "value": "15.4亿"}
+      ]
+    }
+  ]
+}

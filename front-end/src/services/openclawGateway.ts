@@ -54,7 +54,7 @@ interface ExtWebSocket extends WebSocket {
 
 interface PendingRequest {
   sessionKey: string
-  onStream?: ((chunk: string, accumulated: string) => void) | null
+  onStream?: ((chunk: string, accumulated: string, isNewSegment?: boolean) => void) | null
   _accumulatedText: string
   resolve: (result: { text: string }) => void
   reject: (err: Error) => void
@@ -113,12 +113,16 @@ function handleGatewayMessage(data: any) {
     const d = payload.data
     if (d && typeof d.text === 'string' && d.text.length > 0) {
       const newText: string = d.text
-      // Gateway 返回的是全量文本，计算增量发给 onStream
-      const prevLen = req._accumulatedText.length
+      // 检测是否是新的流式分段：当 newText 不是对之前累积文本的延续时，
+      // 说明 Gateway 开始了一个新的流式片段（例如思考 → 工具调用 → 最终答复），
+      // 需要通知上层创建新的对话气泡，而不是覆盖当前气泡。
+      const prevText = req._accumulatedText
+      const isNewSegment = prevText.length > 0 && !newText.startsWith(prevText)
+      const prevLen = isNewSegment ? 0 : prevText.length
       const chunk = newText.slice(prevLen)
       req._accumulatedText = newText
-      if (chunk && req.onStream) {
-        req.onStream(chunk, newText)
+      if (req.onStream && (chunk || isNewSegment)) {
+        req.onStream(chunk, newText, isNewSegment)
       }
     }
     return
@@ -242,7 +246,7 @@ function getWebSocket(): Promise<ExtWebSocket> {
  */
 export async function callOpenClawGateway(
   message: string,
-  onStream?: ((chunk: string, accumulated: string) => void) | null
+  onStream?: ((chunk: string, accumulated: string, isNewSegment?: boolean) => void) | null
 ): Promise<{ text: string }> {
   const socket = await getWebSocket()
   const id = `${Date.now()}-${++messageId}-${Math.random().toString(36).slice(2, 8)}`

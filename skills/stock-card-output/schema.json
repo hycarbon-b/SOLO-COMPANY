@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "股票列表数据结构",
+  "description": "股票卡片生成器的数据结构定义",
+  "type": "object",
+  "required": ["stocks"],
+  "properties": {
+    "stocks": {
+      "type": "array",
+      "description": "股票列表",
+      "items": {
+        "$ref": "#/definitions/Stock"
+      },
+      "minItems": 1
+    }
+  },
+  "definitions": {
+    "Stock": {
+      "type": "object",
+      "description": "单个股票信息",
+      "required": [
+        "name",
+        "code",
+        "price",
+        "changeVal",
+        "changePct",
+        "trend",
+        "tag",
+        "stats"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "股票名称",
+          "minLength": 1
+        },
+        "code": {
+          "type": "string",
+          "description": "股票代码 (格式: XXXXXX.SH/SZ)",
+          "pattern": "^[0-9]{6}\\.(SH|SZ)$"
+        },
+        "price": {
+          "type": "string",
+          "description": "当前价格",
+          "pattern": "^[0-9]+(\\.[0-9]{1,2})?$"
+        },
+        "changeVal": {
+          "type": "string",
+          "description": "涨跌值 (含符号)",
+          "pattern": "^[+\\-][0-9]+(\\.[0-9]{1,2})?$"
+        },
+        "changePct": {
+          "type": "string",
+          "description": "涨跌百分比 (不含%符号)",
+          "pattern": "^[0-9]+(\\.[0-9]{1,2})?$"
+        },
+        "trend": {
+          "type": "string",
+          "description": "趋势",
+          "enum": ["bull", "bear"],
+          "examples": ["bull", "bear"]
+        },
+        "tag": {
+          "type": "string",
+          "description": "标签/板块",
+          "minLength": 1
+        },
+        "stats": {
+          "type": "array",
+          "description": "统计信息列表",
+          "items": {
+            "$ref": "#/definitions/StatItem"
+          },
+          "minItems": 1,
+          "maxItems": 4
+        }
+      }
+    },
+    "StatItem": {
+      "type": "object",
+      "description": "统计项",
+      "required": ["label", "value"],
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "统计项标签",
+          "minLength": 1
+        },
+        "value": {
+          "type": "string",
+          "description": "统计项数值",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

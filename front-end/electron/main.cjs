@@ -50,6 +50,7 @@ async function createWindow() {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
+      webviewTag: true,
     },
     title: 'Trading Application',
   })
@@ -277,6 +278,90 @@ ipcMain.handle('discussion:list', async () => {
   }
 })
 
+// === 外部控制 HTTP 监听：POST 一个 url:port 字符串，打开一个网页 Tab ===
+const OPEN_URL_HTTP_PORT = Number(process.env.OPEN_URL_HTTP_PORT) || 17899
+
+function normalizeTargetUrl(raw) {
+  if (!raw) return null
+  let s = String(raw).trim().replace(/^["']|["']$/g, '')
+  if (!s) return null
+  // 已经包含协议
+  if (/^https?:\/\//i.test(s)) return s
+  // host:port 或 host:port/path
+  if (/^[^/]+:\d+/.test(s)) return `http://${s}`
+  // 仅 host
+  return `http://${s}`
+}
+
+function extractUrlFromBody(body, contentType) {
+  const ct = (contentType || '').toLowerCase()
+  const trimmed = (body || '').trim()
+  if (!trimmed) return null
+  // JSON
+  if (ct.includes('application/json')) {
+    try {
+      const obj = JSON.parse(trimmed)
+      return obj && (obj.url || obj.target || obj.address) || null
+    } catch {
+      return null
+    }
+  }
+  // form-urlencoded: url=xxx
+  if (ct.includes('application/x-www-form-urlencoded')) {
+    const m = /(?:^|&)url=([^&]+)/.exec(trimmed)
+    if (m) return decodeURIComponent(m[1])
+  }
+  // 纯文本：整体作为 url
+  return trimmed
+}
+
+function startOpenUrlHttpServer() {
+  const server = http.createServer((req, res) => {
+    // 允许简单的跨域调用
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204); res.end(); return
+    }
+    if (req.method !== 'POST') {
+      res.writeHead(405, { 'Content-Type': 'text/plain' })
+      res.end('Method Not Allowed')
+      return
+    }
+    let body = ''
+    req.on('data', (c) => { body += c; if (body.length > 1e6) req.destroy() })
+    req.on('end', () => {
+      const raw = extractUrlFromBody(body, req.headers['content-type'])
+      const url = normalizeTargetUrl(raw)
+      if (!url) {
+        res.writeHead(400, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ ok: false, error: 'missing url' }))
+        return
+      }
+      debug('[open-url] request url =', url)
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('open-web-tab', { url })
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ ok: true, url }))
+      } else {
+        res.writeHead(503, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ ok: false, error: 'main window not ready' }))
+      }
+    })
+    req.on('error', (e) => {
+      debug('[open-url] request error:', e.message)
+      try { res.writeHead(500); res.end() } catch {}
+    })
+  })
+  server.on('error', (e) => {
+    debug('[open-url] server error:', e.message)
+  })
+  server.listen(OPEN_URL_HTTP_PORT, '127.0.0.1', () => {
+    debug(`[open-url] HTTP listening on http://127.0.0.1:${OPEN_URL_HTTP_PORT}  (POST body: url:port)`)
+  })
+}
+
 app.whenReady().then(async () => {
   debug('App ready, calling createWindow...')
   try {
@@ -284,6 +369,12 @@ app.whenReady().then(async () => {
     debug('createWindow completed')
   } catch (e) {
     debug('createWindow error:', e.message, e.stack)
+  }
+
+  try {
+    startOpenUrlHttpServer()
+  } catch (e) {
+    debug('startOpenUrlHttpServer error:', e.message)
   }
 
   // On OS X it's common to re-create a window in the app when the
