@@ -1,69 +1,114 @@
-import { Image, FileText, Film, Music, Layers, Upload } from 'lucide-react';
-import { PageHeader, Badge } from '../components/common';
+import { useState } from 'react';
+import { Image, FileText, Film, Music, Layers, Upload, MoreHorizontal, Download, Eye } from 'lucide-react';
+import { PageHeader, Badge, SectionTitle } from '../components/common';
 import { ASSETS } from '@/services/mock';
 
-const ICONS = {
-  image: Image,
-  doc: FileText,
-  video: Film,
-  audio: Music,
-  template: Layers,
-} as const;
+const TYPE_CONFIG: Record<string, { icon: any; bg: string; color: string }> = {
+  image:    { icon: Image,    bg: '#eef2ff', color: '#6366f1' },
+  doc:      { icon: FileText, bg: '#f0fdf4', color: '#16a34a' },
+  video:    { icon: Film,     bg: '#fef2f2', color: '#dc2626' },
+  audio:    { icon: Music,    bg: '#fffbeb', color: '#d97706' },
+  template: { icon: Layers,   bg: '#fdf4ff', color: '#9333ea' },
+};
+
+const FILTER_TABS = ['全部', '图片', '视频', '音频', '文档', '模板'];
+const FILTER_MAP: Record<string, string> = {
+  '图片': 'image', '视频': 'video', '音频': 'audio', '文档': 'doc', '模板': 'template',
+};
+
+const KIND_LABEL: Record<string, string> = {
+  image: '图片', doc: '文档', video: '视频', audio: '音频', template: '模板',
+};
 
 export function LibraryPage() {
+  const [activeTab, setActiveTab] = useState('全部');
+  const filtered = activeTab === '全部'
+    ? ASSETS
+    : ASSETS.filter((a) => a.kind === FILTER_MAP[activeTab]);
+
   return (
     <div className="page-shell" data-testid="page-library">
       <div className="page-inner">
         <PageHeader
-          title="素材库 Library"
+          title="素材库"
           description="所有图片、视频、音频、模板统一管理。"
           actions={
-            <button
-              className="text-xs px-3 py-1.5 rounded-lg text-white flex items-center gap-1.5"
-              style={{ background: 'var(--primary)' }}
-            >
-              <Upload className="h-3.5 w-3.5" /> 上传素材
+            <button className="btn-primary">
+              <Upload className="h-3.5 w-3.5" />
+              上传素材
             </button>
           }
         />
 
-        <div className="flex gap-2 flex-wrap">
-          {['全部', '图片', '视频', '音频', '文档', '模板'].map((t, i) => (
-            <button
-              key={t}
-              className={`text-xs px-3 py-1.5 rounded-full border ${
-                i === 0 ? 'text-white' : 'bg-white'
-              }`}
-              style={{
-                borderColor: 'var(--panel-border)',
-                background: i === 0 ? 'var(--primary)' : undefined,
-              }}
-            >
-              {t}
-            </button>
-          ))}
+        {/* Filter tabs */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex gap-1.5 flex-wrap">
+            {FILTER_TABS.map((t) => (
+              <button
+                key={t}
+                onClick={() => setActiveTab(t)}
+                className={`text-[12px] px-3 py-1.5 rounded-full font-medium transition-all border ${
+                  activeTab === t
+                    ? 'text-white border-transparent shadow-sm'
+                    : 'bg-white text-[color:var(--muted-foreground)] hover:text-slate-700'
+                }`}
+                style={{
+                  borderColor: activeTab === t ? 'transparent' : 'var(--panel-border)',
+                  background: activeTab === t ? 'var(--primary)' : undefined,
+                  boxShadow: activeTab === t ? '0 1px 4px rgba(79,70,229,0.25)' : undefined,
+                }}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+          <span className="text-[12px] text-[color:var(--muted-foreground)] shrink-0">
+            {filtered.length} 个文件
+          </span>
         </div>
 
+        {/* Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {ASSETS.map((a) => {
-            const Icon = ICONS[a.kind as keyof typeof ICONS] ?? FileText;
+          {filtered.map((a) => {
+            const cfg = TYPE_CONFIG[a.kind] ?? TYPE_CONFIG.doc;
+            const Icon = cfg.icon;
             return (
-              <div key={a.id} className="panel p-3 flex flex-col gap-2">
+              <div key={a.id} className="panel-interactive group flex flex-col overflow-hidden">
+                {/* Thumbnail / icon area */}
                 <div
-                  className="aspect-square rounded-lg flex items-center justify-center"
-                  style={{ background: 'var(--panel-muted)' }}
+                  className="aspect-square flex flex-col items-center justify-center relative"
+                  style={{ background: cfg.bg }}
                 >
-                  <Icon className="h-10 w-10 text-slate-400" />
+                  <Icon className="h-12 w-12" style={{ color: cfg.color, opacity: 0.7 }} />
+                  {/* Hover overlay with actions */}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                    <button className="h-8 w-8 rounded-lg bg-white shadow flex items-center justify-center hover:bg-slate-50">
+                      <Eye className="h-3.5 w-3.5 text-slate-600" />
+                    </button>
+                    <button className="h-8 w-8 rounded-lg bg-white shadow flex items-center justify-center hover:bg-slate-50">
+                      <Download className="h-3.5 w-3.5 text-slate-600" />
+                    </button>
+                  </div>
+                  {/* Kind badge top-right */}
+                  <div className="absolute top-2 right-2">
+                    <span
+                      className="text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider"
+                      style={{ background: cfg.color, color: '#fff', opacity: 0.9 }}
+                    >
+                      {KIND_LABEL[a.kind] ?? a.kind}
+                    </span>
+                  </div>
                 </div>
-                <div className="text-xs font-medium truncate" title={a.name}>
-                  {a.name}
-                </div>
-                <div className="flex items-center justify-between text-[11px] text-[color:var(--muted-foreground)]">
-                  <span>{a.size}</span>
-                  <Badge color="gray">{a.kind}</Badge>
-                </div>
-                <div className="text-[10px] text-[color:var(--muted-foreground)]">
-                  {a.updated}
+
+                {/* Info */}
+                <div className="p-3">
+                  <div className="text-[12px] font-medium truncate mb-1" title={a.name}>
+                    {a.name}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-[color:var(--muted-foreground)]">{a.size}</span>
+                    <span className="text-[11px] text-[color:var(--muted-foreground)]">{a.updated}</span>
+                  </div>
                 </div>
               </div>
             );
@@ -73,3 +118,4 @@ export function LibraryPage() {
     </div>
   );
 }
+

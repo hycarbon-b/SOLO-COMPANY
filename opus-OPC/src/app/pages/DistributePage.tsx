@@ -126,7 +126,7 @@ export function DistributePage() {
       )}
       <div className="page-inner">
         <PageHeader
-          title="分发中心 Distribute"
+          title="分发中心"
           description="一稿多投：选择目标平台 → 自动适配 → 排程发布。"
           actions={
             <button
@@ -139,92 +139,105 @@ export function DistributePage() {
           }
         />
 
-        <div className="flex gap-2 flex-wrap">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`text-xs px-3 py-1.5 rounded-full border ${
-                tab === t.key ? 'text-white' : 'bg-white'
-              }`}
-              style={{
-                borderColor: 'var(--panel-border)',
-                background: tab === t.key ? 'var(--primary)' : undefined,
-              }}
-            >
-              {t.label}
-            </button>
-          ))}
+        {/* Filter tabs */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex gap-1.5 flex-wrap">
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`text-[12px] px-3 py-1.5 rounded-full font-medium transition-all border ${
+                  tab === t.key ? 'text-white border-transparent shadow-sm' : 'bg-white text-[color:var(--muted-foreground)] hover:text-slate-700'
+                }`}
+                style={{
+                  borderColor: tab === t.key ? 'transparent' : 'var(--panel-border)',
+                  background: tab === t.key ? 'var(--primary)' : undefined,
+                  boxShadow: tab === t.key ? '0 1px 4px rgba(79,70,229,0.25)' : undefined,
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <span className="text-[12px] text-[color:var(--muted-foreground)] shrink-0">
+            {drafts.length} 条内容
+          </span>
         </div>
 
+        {/* Draft cards */}
         <div className="space-y-3">
-          {drafts.map((d) => (
-            <div key={d.id} data-testid={`draft-card-${d.id}`} className="panel p-4 flex items-start gap-4">
+          {drafts.map((d) => {
+            const typeEmoji = { 'short-video': '🎬', 'image-set': '🖼️', 'tweet': '✏️', 'article': '📝' }[d.type] ?? '📄';
+            const statusCfg = {
+              published: { color: 'green' as const, label: '已发布', dot: true },
+              queued:    { color: 'indigo' as const, label: '已排程', dot: true },
+              draft:     { color: 'gray' as const,   label: '草稿',   dot: false },
+              failed:    { color: 'red' as const,    label: '失败',   dot: true },
+            }[d.status] ?? { color: 'gray' as const, label: d.status, dot: false };
+
+            return (
               <div
-                className="h-16 w-16 rounded-lg shrink-0 flex items-center justify-center text-2xl"
-                style={{ background: 'var(--panel-muted)' }}
+                key={d.id}
+                data-testid={`draft-card-${d.id}`}
+                className="panel p-4 flex items-start gap-4 transition-shadow hover:shadow-md"
+                style={{ transition: 'box-shadow var(--t-base)' }}
               >
-                {d.type === 'short-video'
-                  ? '🎬'
-                  : d.type === 'image-set'
-                  ? '🖼️'
-                  : d.type === 'tweet'
-                  ? '🐦'
-                  : '📝'}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm font-semibold truncate">{d.title}</span>
-                  <Badge
-                    color={
-                      d.status === 'published'
-                        ? 'green'
-                        : d.status === 'failed'
-                        ? 'red'
-                        : d.status === 'queued'
-                        ? 'indigo'
-                        : 'gray'
-                    }
-                  >
-                    {d.status}
-                  </Badge>
-                </div>
-                <div className="text-xs text-[color:var(--muted-foreground)] line-clamp-1">
-                  {d.excerpt}
-                </div>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {d.platforms.map((pid) => {
-                    const p = PLATFORMS.find((x) => x.id === pid);
-                    if (!p) return null;
-                    return (
-                      <span
-                        key={pid}
-                        className="text-[10px] px-2 py-0.5 rounded text-white"
-                        style={{ background: p.color }}
-                      >
-                        {p.shortLabel}
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="flex flex-col items-end gap-2 shrink-0">
-                <div className="text-xs text-[color:var(--muted-foreground)] flex items-center gap-1.5">
-                  <Clock className="h-3.5 w-3.5" />
-                  {d.scheduledAt}
-                </div>
-                <button
-                  onClick={() => setPreviewDraft(d)}
-                  className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border hover:bg-slate-50 transition"
-                  style={{ borderColor: 'var(--panel-border)' }}
-                  data-testid={`preview-btn-${d.id}`}
+                {/* Type icon */}
+                <div
+                  className="h-14 w-14 rounded-xl shrink-0 flex items-center justify-center text-2xl"
+                  style={{ background: 'var(--panel-muted)', border: '1px solid var(--panel-border)' }}
                 >
-                  <Eye className="h-3 w-3" />
-                  预览
-                </button>
+                  {typeEmoji}
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start gap-2 mb-1.5">
+                    <span className="text-[13px] font-semibold truncate flex-1">{d.title}</span>
+                    <Badge color={statusCfg.color} dot={statusCfg.dot}>
+                      {statusCfg.label}
+                    </Badge>
+                  </div>
+                  <div className="text-[12px] text-[color:var(--muted-foreground)] line-clamp-1 mb-2">
+                    {d.excerpt}
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {d.platforms.map((pid) => {
+                      const p = PLATFORMS.find((x) => x.id === pid);
+                      if (!p) return null;
+                      return (
+                        <span
+                          key={pid}
+                          className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                          style={{ background: `${p.color}18`, color: p.color }}
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full" style={{ background: p.color }} />
+                          {p.shortLabel}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex flex-col items-end gap-2.5 shrink-0">
+                  <div className="flex items-center gap-1.5 text-[11px] text-[color:var(--muted-foreground)]">
+                    <Clock className="h-3 w-3" />
+                    {d.scheduledAt}
+                  </div>
+                  <button
+                    onClick={() => setPreviewDraft(d)}
+                    className="btn-secondary text-[12px]"
+                    style={{ padding: '5px 10px', fontSize: 12 }}
+                    data-testid={`preview-btn-${d.id}`}
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    预览
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

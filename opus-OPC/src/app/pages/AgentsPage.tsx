@@ -210,51 +210,57 @@ export function AgentsPage() {
 
       <div className="page-inner">
         <PageHeader
-          title="AI 代理 Agents"
+          title="AI 代理"
           description="把重复劳动交给 Agent · 你只看产出。"
           actions={
             <button
               onClick={() => setShowNewModal(true)}
-              className="text-xs px-3 py-1.5 rounded-lg text-white"
-              style={{ background: 'var(--primary)' }}
+              className="btn-primary"
               data-testid="new-agent-btn"
             >
+              <Bot className="h-3.5 w-3.5" />
               + 新建 Agent
             </button>
           }
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {agents.map((a) => (
-            <div key={a.id} className="panel p-4 flex flex-col gap-3">
+          {agents.map((a) => {
+            const statusCfg = {
+              running: { color: 'green' as const, label: '运行中', dot: true, ring: '#10b981' },
+              idle:    { color: 'gray'  as const, label: '空闲',   dot: false, ring: '#94a3b8' },
+              error:   { color: 'red'   as const, label: '错误',   dot: true,  ring: '#ef4444' },
+            }[a.status] ?? { color: 'gray' as const, label: a.status, dot: false, ring: '#94a3b8' };
+
+            return (
+            <div key={a.id} className="panel p-4 flex flex-col gap-3 transition-shadow hover:shadow-md" style={{ transition: 'box-shadow var(--t-base)' }}>
               <div className="flex items-start justify-between">
                 <div
                   className="h-10 w-10 rounded-xl flex items-center justify-center text-white"
-                  style={{ background: 'linear-gradient(135deg,#6366f1,#ec4899)' }}
+                  style={{ background: 'var(--gradient-brand)' }}
                 >
                   <Bot className="h-5 w-5" />
                 </div>
-                <Badge
-                  color={a.status === 'running' ? 'green' : a.status === 'error' ? 'red' : 'gray'}
-                >
-                  {a.status}
+                <Badge color={statusCfg.color} dot={statusCfg.dot}>
+                  {statusCfg.label}
                 </Badge>
               </div>
               <div>
-                <div className="text-base font-semibold">{a.name}</div>
-                <div className="mt-1 text-xs text-[color:var(--muted-foreground)] line-clamp-2">
+                <div className="text-[14px] font-semibold">{a.name}</div>
+                <div className="mt-1 text-[12px] text-[color:var(--muted-foreground)] line-clamp-2">
                   {a.role}
                 </div>
               </div>
-              <div className="text-[11px] text-[color:var(--muted-foreground)]">
-                上次运行：{a.lastRun}
+              <div className="text-[11px] text-[color:var(--muted-foreground)] flex items-center gap-1.5">
+                <span>上次运行：</span>
+                <span className="font-medium text-slate-600">{a.lastRun}</span>
               </div>
               {/* Run history mini bar */}
-              <div className="flex items-center gap-0.5">
+              <div className="flex items-center gap-0.5" title="近 15 次运行状态">
                 {[1,1,1,0,1,1,0,1,1,1,1,0,1,1,a.status==='error'?0:1].map((ok, i) => (
                   <div
                     key={i}
-                    className="h-1.5 flex-1 rounded-full"
+                    className="h-1.5 flex-1 rounded-full transition-colors"
                     style={{
                       background: ok
                         ? a.status === 'error' && i === 14 ? '#ef4444' : '#10b981'
@@ -263,38 +269,28 @@ export function AgentsPage() {
                   />
                 ))}
               </div>
-              <div className="flex items-center gap-2 mt-1">
+              <div className="flex items-center gap-1.5 mt-1">
                 <button
                   onClick={() => toggleAgent(a.id, a.status)}
-                  className="flex-1 text-xs px-3 py-1.5 rounded-lg border flex items-center justify-center gap-1.5"
-                  style={{ borderColor: 'var(--panel-border)' }}
+                  className="btn-secondary flex-1"
+                  style={{ justifyContent: 'center' }}
                 >
                   {a.status === 'running' ? (
-                    <>
-                      <Pause className="h-3 w-3" />
-                      暂停
-                    </>
+                    <><Pause className="h-3 w-3" />暂停</>
                   ) : (
-                    <>
-                      <Play className="h-3 w-3" />
-                      启动
-                    </>
+                    <><Play className="h-3 w-3" />启动</>
                   )}
                 </button>
                 <button
-                  onClick={() => {
-                    toast.success(`${a.name} 重跑中…`);
-                  }}
-                  className="text-xs px-3 py-1.5 rounded-lg border flex items-center gap-1.5"
-                  style={{ borderColor: 'var(--panel-border)' }}
+                  onClick={() => toast.success(`${a.name} 重跑中…`)}
+                  className="btn-secondary"
                 >
                   <RotateCcw className="h-3 w-3" />
                   重跑
                 </button>
                 <button
                   onClick={() => setLogAgent(a)}
-                  className="text-xs px-2 py-1.5 rounded-lg border flex items-center gap-1"
-                  style={{ borderColor: 'var(--panel-border)' }}
+                  className="btn-secondary"
                   data-testid={`log-btn-${a.id}`}
                 >
                   <FileText className="h-3 w-3" />
@@ -302,7 +298,8 @@ export function AgentsPage() {
                 </button>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

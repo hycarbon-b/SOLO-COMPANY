@@ -10,114 +10,235 @@ import {
   Bot,
   Settings,
   Sparkles,
+  Bell,
+  Search,
+  Plus,
+  ChevronRight,
+  User,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const NAV_ITEMS = [
-  { to: '/', label: '总览 Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/studio', label: '内容创作 Studio', icon: PenSquare },
-  { to: '/library', label: '素材库 Library', icon: FolderOpen },
-  { to: '/distribute', label: '分发中心 Distribute', icon: Send },
-  { to: '/schedule', label: '排程日历 Schedule', icon: Calendar },
-  { to: '/streaming', label: '直播推流 Streaming', icon: Radio },
-  { to: '/analytics', label: '数据分析 Analytics', icon: BarChart3 },
-  { to: '/agents', label: 'AI 代理 Agents', icon: Bot },
-  { to: '/settings', label: '设置 Settings', icon: Settings },
+const NAV_GROUPS = [
+  {
+    label: '工作区',
+    items: [
+      { to: '/', label: '总览', icon: LayoutDashboard, end: true },
+      { to: '/studio', label: '内容创作', icon: PenSquare },
+      { to: '/library', label: '素材库', icon: FolderOpen },
+      { to: '/distribute', label: '分发中心', icon: Send },
+      { to: '/schedule', label: '排程日历', icon: Calendar },
+      { to: '/streaming', label: '直播推流', icon: Radio },
+    ],
+  },
+  {
+    label: '数据 & 智能',
+    items: [
+      { to: '/analytics', label: '数据分析', icon: BarChart3 },
+      { to: '/agents', label: 'AI 代理', icon: Bot },
+    ],
+  },
+];
+
+const SETTINGS_ITEM = { to: '/settings', label: '设置', icon: Settings };
+
+// Flatten for "current label" lookup in header
+const ALL_ITEMS = [
+  ...NAV_GROUPS.flatMap((g) => g.items),
+  SETTINGS_ITEM,
 ];
 
 export function AppShell() {
   const location = useLocation();
-  const current = NAV_ITEMS.find((i) =>
-    i.end ? location.pathname === i.to : location.pathname.startsWith(i.to)
+  const current = ALL_ITEMS.find((i) =>
+    (i as { end?: boolean }).end
+      ? location.pathname === i.to
+      : location.pathname.startsWith(i.to)
   );
 
   return (
     <div className="flex h-screen overflow-hidden">
+      {/* ── Sidebar ─────────────────────────────────────────── */}
       <aside
-        className="w-64 shrink-0 flex flex-col border-r"
-        style={{ background: 'var(--sidebar)', borderColor: 'var(--panel-border)' }}
+        className="shrink-0 flex flex-col border-r overflow-hidden"
+        style={{
+          width: 'var(--sidebar-width)',
+          background: 'var(--sidebar)',
+          borderColor: 'var(--panel-border)',
+          boxShadow: '1px 0 0 var(--panel-border)',
+        }}
         data-testid="app-sidebar"
       >
-        <div className="px-5 py-5 flex items-center gap-2">
+        {/* Brand */}
+        <div className="px-4 pt-5 pb-4 flex items-center gap-2.5 shrink-0">
           <div
-            className="h-9 w-9 rounded-xl flex items-center justify-center text-white"
-            style={{ background: 'linear-gradient(135deg, #6366f1, #ec4899)' }}
+            className="h-8 w-8 rounded-xl flex items-center justify-center text-white shrink-0"
+            style={{ background: 'var(--gradient-brand)' }}
           >
-            <Sparkles className="h-5 w-5" />
+            <Sparkles className="h-4 w-4" />
           </div>
           <div className="flex flex-col leading-tight">
-            <span className="text-sm font-semibold">OPUS-OPC</span>
-            <span className="text-xs text-[color:var(--muted-foreground)]">
+            <span className="text-[13px] font-bold tracking-wide">OPUS-OPC</span>
+            <span className="text-[10px] text-[color:var(--muted-foreground)]">
               一人公司工作台
             </span>
           </div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 pb-4 space-y-1">
-          {NAV_ITEMS.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
-                  isActive
-                    ? 'font-medium'
-                    : 'text-[color:var(--muted-foreground)] hover:bg-[color:var(--muted)]'
-                )
-              }
-              style={({ isActive }) =>
-                isActive
-                  ? {
-                      background: 'var(--sidebar-active)',
-                      color: 'var(--sidebar-active-foreground)',
+        {/* Nav groups */}
+        <nav className="flex-1 overflow-y-auto px-3 pb-2">
+          {NAV_GROUPS.map((group) => (
+            <div key={group.label} className="mb-4">
+              <div
+                className="px-2 mb-1 text-[10px] font-semibold uppercase tracking-widest"
+                style={{ color: 'var(--sidebar-section-label)' }}
+              >
+                {group.label}
+              </div>
+              <div className="space-y-0.5">
+                {group.items.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={(item as { end?: boolean }).end}
+                    className={({ isActive }) =>
+                      cn(
+                        'nav-active-bar flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition-colors',
+                        isActive
+                          ? 'font-semibold'
+                          : 'text-[color:var(--muted-foreground)] hover:bg-slate-50 hover:text-slate-800'
+                      )
                     }
-                  : undefined
-              }
-            >
-              <item.icon className="h-4 w-4" />
-              <span>{item.label}</span>
-            </NavLink>
+                    style={({ isActive }) =>
+                      isActive
+                        ? {
+                            background: 'var(--sidebar-active)',
+                            color: 'var(--sidebar-active-foreground)',
+                          }
+                        : undefined
+                    }
+                  >
+                    <item.icon className="h-3.5 w-3.5 shrink-0" />
+                    <span>{item.label}</span>
+                  </NavLink>
+                ))}
+              </div>
+            </div>
           ))}
+
+          {/* Settings as separator item */}
+          <div
+            className="my-2 border-t"
+            style={{ borderColor: 'var(--panel-border)' }}
+          />
+          <NavLink
+            to={SETTINGS_ITEM.to}
+            className={({ isActive }) =>
+              cn(
+                'flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition-colors',
+                isActive
+                  ? 'font-semibold'
+                  : 'text-[color:var(--muted-foreground)] hover:bg-slate-50 hover:text-slate-800'
+              )
+            }
+            style={({ isActive }) =>
+              isActive
+                ? { background: 'var(--sidebar-active)', color: 'var(--sidebar-active-foreground)' }
+                : undefined
+            }
+          >
+            <Settings className="h-3.5 w-3.5 shrink-0" />
+            <span>{SETTINGS_ITEM.label}</span>
+          </NavLink>
         </nav>
 
+        {/* Plan usage */}
         <div
-          className="m-3 rounded-xl p-3 text-xs"
+          className="mx-3 mb-3 rounded-xl p-3"
           style={{ background: 'var(--panel-muted)', border: '1px solid var(--panel-border)' }}
         >
-          <div className="font-medium mb-1">本月套餐</div>
-          <div className="text-[color:var(--muted-foreground)]">Solo Pro · 6 平台</div>
-          <div className="mt-2 h-1.5 bg-[color:var(--muted)] rounded-full overflow-hidden">
-            <div
-              className="h-full"
-              style={{ width: '62%', background: 'var(--primary)' }}
-            />
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-semibold">Solo Pro</span>
+            <span className="text-[10px] text-[color:var(--muted-foreground)]">62%</span>
           </div>
-          <div className="mt-1 text-[10px] text-[color:var(--muted-foreground)]">
-            62 / 100 次发布
+          <div className="progress-bar mb-1.5">
+            <div className="progress-fill" style={{ width: '62%' }} />
           </div>
+          <div className="text-[10px] text-[color:var(--muted-foreground)]">
+            62 / 100 次发布 · 6 平台
+          </div>
+        </div>
+
+        {/* User profile */}
+        <div
+          className="px-3 py-3 border-t flex items-center gap-2.5"
+          style={{ borderColor: 'var(--panel-border)' }}
+        >
+          <div
+            className="h-7 w-7 rounded-full shrink-0 flex items-center justify-center text-white text-xs font-bold"
+            style={{ background: 'var(--gradient-primary)' }}
+          >
+            张
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[12px] font-medium truncate">张·Solo Founder</div>
+            <div className="text-[10px] text-[color:var(--muted-foreground)]">plan@opus.so</div>
+          </div>
+          <User className="h-3.5 w-3.5 text-[color:var(--muted-foreground)] shrink-0" />
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col overflow-hidden">
+      {/* ── Main ────────────────────────────────────────────── */}
+      <main className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {/* Top header bar */}
         <header
-          className="h-14 shrink-0 flex items-center justify-between px-6 border-b"
-          style={{ background: 'var(--panel-background)', borderColor: 'var(--panel-border)' }}
+          className="h-13 shrink-0 flex items-center justify-between px-5 border-b gap-4"
+          style={{
+            background: 'var(--panel-background)',
+            borderColor: 'var(--panel-border)',
+            backdropFilter: 'blur(16px)',
+          }}
         >
-          <div>
-            <h1 className="text-base font-semibold" data-testid="page-title">
-              {current?.label ?? 'OPUS-OPC'}
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-1.5 text-sm min-w-0">
+            <span className="text-[color:var(--muted-foreground)] text-[12px]">OPUS-OPC</span>
+            <ChevronRight className="h-3.5 w-3.5 text-slate-300 shrink-0" />
+            <h1
+              className="text-[13px] font-semibold truncate"
+              data-testid="page-title"
+            >
+              {current?.label ?? 'Workspace'}
             </h1>
           </div>
-          <div className="flex items-center gap-3">
+
+          {/* Actions */}
+          <div className="flex items-center gap-2 shrink-0">
             <button
-              className="text-xs px-3 py-1.5 rounded-lg text-white"
-              style={{ background: 'var(--primary)' }}
+              className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors"
+              title="搜索"
             >
-              + 新建创作
+              <Search className="h-4 w-4 text-[color:var(--muted-foreground)]" />
             </button>
-            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-indigo-400 to-pink-400" />
+            <button
+              className="relative h-8 w-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors"
+              title="通知"
+            >
+              <Bell className="h-4 w-4 text-[color:var(--muted-foreground)]" />
+              <span
+                className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full"
+                style={{ background: 'var(--accent)' }}
+              />
+            </button>
+            <div className="w-px h-5 bg-slate-200 mx-1" />
+            <button className="btn-primary">
+              <Plus className="h-3.5 w-3.5" />
+              新建创作
+            </button>
+            <div
+              className="h-7 w-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
+              style={{ background: 'var(--gradient-primary)' }}
+            >
+              张
+            </div>
           </div>
         </header>
 
@@ -128,3 +249,4 @@ export function AppShell() {
     </div>
   );
 }
+

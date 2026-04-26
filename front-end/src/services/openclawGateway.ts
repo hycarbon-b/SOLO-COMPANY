@@ -273,8 +273,8 @@ export async function callOpenClawGateway(
       },
     })
 
-    const params: Record<string, string> = { message, sessionKey, idempotencyKey: id }
-    if (systemPrompt) params.systemPrompt = systemPrompt
+    const finalMessage = systemPrompt ? `${systemPrompt}\n\n${message}` : message
+    const params: Record<string, string> = { message: finalMessage, sessionKey, idempotencyKey: id }
 
     socket.send(
       JSON.stringify({
