@@ -4,10 +4,35 @@
  * 从 .env 加载：VITE_OPENCLAW_GATEWAY_URL, VITE_OPENCLAW_GATEWAY_KEY
  */
 
-// ===== WS日志记录 =====
+// ===== WS帧日志总线 =====
+export interface WsLogEntry {
+  id: number
+  dir: 'SEND' | 'RECV'
+  ts: number
+  data: unknown
+}
+
+let _wsLogSeq = 0
+const WS_LOG_MAX = 500
+const _wsLogBuffer: WsLogEntry[] = []
+const _wsLogSubscribers = new Set<(entry: WsLogEntry) => void>()
+
 function logWs(prefix: string, data: unknown) {
   // 输出到控制台，被main进程捕获并写入openclaw-gateway-ws.log
   console.log(`[WS ${prefix}]`, JSON.stringify(data))
+  const entry: WsLogEntry = { id: ++_wsLogSeq, dir: prefix as 'SEND' | 'RECV', ts: Date.now(), data }
+  if (_wsLogBuffer.length >= WS_LOG_MAX) _wsLogBuffer.shift()
+  _wsLogBuffer.push(entry)
+  _wsLogSubscribers.forEach(fn => { try { fn(entry) } catch {} })
+}
+
+export function getWsLogBuffer(): WsLogEntry[] {
+  return [..._wsLogBuffer]
+}
+
+export function subscribeWsLog(fn: (entry: WsLogEntry) => void): () => void {
+  _wsLogSubscribers.add(fn)
+  return () => _wsLogSubscribers.delete(fn)
 }
 
 // ===== 配置 =====

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { PageHeader, Badge } from '../components/common';
-import { DRAFTS, PLATFORMS, type DraftStatus, type ContentDraft } from '@/services/mock';
-import { Send, Clock, Eye, X, ExternalLink } from 'lucide-react';
+import { PLATFORMS, type DraftStatus, type ContentDraft } from '@/services/mock';
+import { draftsStore, useStore, recordActivity } from '@/services/store';
+import { Send, Clock, Eye, X, ExternalLink, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const TABS: Array<{ key: 'all' | DraftStatus; label: string }> = [
@@ -13,7 +14,7 @@ const TABS: Array<{ key: 'all' | DraftStatus; label: string }> = [
 ];
 
 // Preview modal – shows how a draft looks on each target platform
-function PreviewModal({ draft, onClose }: { draft: ContentDraft; onClose: () => void }) {
+function PreviewModal({ draft, onClose, onConfirmPublish }: { draft: ContentDraft; onClose: () => void; onConfirmPublish: () => void }) {
   const targetPlatforms = PLATFORMS.filter((p) => draft.platforms.includes(p.id));
 
   return (
@@ -99,11 +100,10 @@ function PreviewModal({ draft, onClose }: { draft: ContentDraft; onClose: () => 
             </button>
             <button
               onClick={() => {
-                toast.success('已加入发布队列');
+                onConfirmPublish();
                 onClose();
               }}
-              className="text-xs px-3 py-1.5 rounded-lg text-white"
-              style={{ background: 'var(--primary)' }}
+              className="btn-primary"
             >
               确认发布
             </button>
@@ -117,12 +117,28 @@ function PreviewModal({ draft, onClose }: { draft: ContentDraft; onClose: () => 
 export function DistributePage() {
   const [tab, setTab] = useState<'all' | DraftStatus>('all');
   const [previewDraft, setPreviewDraft] = useState<ContentDraft | null>(null);
-  const drafts = tab === 'all' ? DRAFTS : DRAFTS.filter((d) => d.status === tab);
+  const [allDrafts] = useStore(draftsStore);
+  const drafts = tab === 'all' ? allDrafts : allDrafts.filter((d) => d.status === tab);
+
+  function publishDraft(d: ContentDraft) {
+    draftsStore.update((cur) => cur.map((x) => x.id === d.id ? { ...x, status: 'published', scheduledAt: '已发布 · 刚刚' } : x));
+    recordActivity({ type: 'publish', text: `《${d.title}》已加入发布队列`, icon: '•' });
+    toast.success(`《${d.title}》已加入发布队列`);
+  }
+
+  function deleteDraft(id: string) {
+    draftsStore.update((cur) => cur.filter((x) => x.id !== id));
+    toast('已删除草稿');
+  }
 
   return (
     <div className="page-shell" data-testid="page-distribute">
       {previewDraft && (
-        <PreviewModal draft={previewDraft} onClose={() => setPreviewDraft(null)} />
+        <PreviewModal
+          draft={previewDraft}
+          onClose={() => setPreviewDraft(null)}
+          onConfirmPublish={() => publishDraft(previewDraft)}
+        />
       )}
       <div className="page-inner">
         <PageHeader
@@ -130,9 +146,16 @@ export function DistributePage() {
           description="一稿多投：选择目标平台 → 自动适配 → 排程发布。"
           actions={
             <button
-              onClick={() => toast.success('已加入发布队列')}
-              className="text-xs px-3 py-1.5 rounded-lg text-white flex items-center gap-1.5"
-              style={{ background: 'var(--primary)' }}
+              onClick={() => {
+                const queued = allDrafts.filter((d) => d.status === 'queued');
+                if (queued.length === 0) { toast('没有已排程的草稿'); return; }
+                queued.forEach((d) => {
+                  draftsStore.update((cur) => cur.map((x) => x.id === d.id ? { ...x, status: 'published', scheduledAt: '已发布 · 刚刚' } : x));
+                  recordActivity({ type: 'publish', text: `《${d.title}》已加入发布队列`, icon: '•' });
+                });
+                toast.success('已加入发布队列');
+              }}
+              className="btn-primary"
             >
               <Send className="h-3.5 w-3.5" /> 一键发布
             </button>
@@ -225,15 +248,24 @@ export function DistributePage() {
                     <Clock className="h-3 w-3" />
                     {d.scheduledAt}
                   </div>
-                  <button
-                    onClick={() => setPreviewDraft(d)}
-                    className="btn-secondary text-[12px]"
-                    style={{ padding: '5px 10px', fontSize: 12 }}
-                    data-testid={`preview-btn-${d.id}`}
-                  >
-                    <Eye className="h-3.5 w-3.5" />
-                    预览
-                  </button>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => setPreviewDraft(d)}
+                      className="btn-secondary"
+                      data-testid={`preview-btn-${d.id}`}
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      预览
+                    </button>
+                    <button
+                      onClick={() => deleteDraft(d.id)}
+                      className="btn-secondary"
+                      title="删除"
+                      data-testid={`delete-btn-${d.id}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             );

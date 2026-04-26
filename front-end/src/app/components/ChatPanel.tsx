@@ -1,11 +1,77 @@
 import { Mic, ArrowUp, Edit2, X, HardDrive, Upload } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useState, useRef, useEffect } from 'react';
 import { libraryFiles, type Message, type LibraryFile } from '../fakeChatData';
 import { AttachmentPreviewList } from './AttachmentPreviewList';
 import { FileLibraryModal } from './FileLibraryModal';
 import { StrategyCard } from './StrategyCard';
 import { StockPickerTable } from './StockPickerTable';
+
+// ─── Styled Markdown renderer ───────────────────────────────────────────────
+function MdContent({ children }: { children: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        // Headings
+        h1: ({ children }) => <h1 className="text-base font-bold text-gray-900 mt-3 mb-1.5 leading-snug">{children}</h1>,
+        h2: ({ children }) => <h2 className="text-[13px] font-semibold text-gray-800 mt-2.5 mb-1 leading-snug">{children}</h2>,
+        h3: ({ children }) => <h3 className="text-[12px] font-semibold text-gray-700 mt-2 mb-0.5 leading-snug">{children}</h3>,
+        // Paragraphs
+        p: ({ children }) => <p className="text-[13px] text-gray-800 leading-6 mb-2 last:mb-0">{children}</p>,
+        // Lists
+        ul: ({ children }) => <ul className="text-[13px] text-gray-800 leading-6 mb-2 list-disc list-inside space-y-0.5 pl-1">{children}</ul>,
+        ol: ({ children }) => <ol className="text-[13px] text-gray-800 leading-6 mb-2 list-decimal list-inside space-y-0.5 pl-1">{children}</ol>,
+        li: ({ children }) => <li className="leading-6 pl-0.5">{children}</li>,
+        // Blockquote
+        blockquote: ({ children }) => (
+          <blockquote className="border-l-3 border-gray-300 pl-3 my-2 text-[12px] text-gray-500 italic">
+            {children}
+          </blockquote>
+        ),
+        // Code
+        code: ({ inline, children, ...props }: { inline?: boolean; children?: React.ReactNode }) =>
+          inline ? (
+            <code className="bg-gray-100 text-gray-800 text-[11px] font-mono px-1.5 py-0.5 rounded">{children}</code>
+          ) : (
+            <code className="block bg-gray-50 border border-gray-200 text-[11px] font-mono text-gray-800 px-3 py-2 rounded-lg overflow-x-auto whitespace-pre" {...props}>{children}</code>
+          ),
+        pre: ({ children }) => <pre className="my-2 overflow-x-auto">{children}</pre>,
+        // Horizontal rule
+        hr: () => <hr className="border-t border-gray-200 my-3" />,
+        // Bold / Italic
+        strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
+        em: ({ children }) => <em className="italic text-gray-700">{children}</em>,
+        // Links
+        a: ({ href, children }) => (
+          <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-[13px]">{children}</a>
+        ),
+        // ── Tables (GFM) ──────────────────────────────────────────────────
+        table: ({ children }) => (
+          <div className="my-2 overflow-x-auto rounded-lg border border-gray-200">
+            <table className="w-full text-[12px] border-collapse">{children}</table>
+          </div>
+        ),
+        thead: ({ children }) => <thead className="bg-gray-50">{children}</thead>,
+        tbody: ({ children }) => <tbody className="divide-y divide-gray-100">{children}</tbody>,
+        tr: ({ children }) => <tr className="hover:bg-gray-50/60 transition-colors">{children}</tr>,
+        th: ({ children }) => (
+          <th className="px-3 py-2 text-left text-[11px] font-semibold text-gray-600 whitespace-nowrap border-b border-gray-200">
+            {children}
+          </th>
+        ),
+        td: ({ children }) => (
+          <td className="px-3 py-2 text-gray-700 whitespace-nowrap">
+            {children}
+          </td>
+        ),
+      }}
+    >
+      {children}
+    </ReactMarkdown>
+  );
+}
 
 interface ChatPanelProps {
   messages: Message[];
@@ -128,7 +194,7 @@ export function ChatPanel({ messages, isTyping, inputValue, setInputValue, onSen
                       {message.isStrategy ? (
                         <div className="max-w-2xl">
                           <div className="bg-white rounded-2xl px-4 py-3 shadow-sm mb-3">
-                            <div className="text-gray-900 prose prose-sm max-w-none"><ReactMarkdown>{message.content}</ReactMarkdown></div>
+                            <MdContent>{message.content}</MdContent>
                           </div>
                           <StrategyCard
                             title="双均线交易策略"
@@ -168,13 +234,13 @@ def dual_ma_strategy(data, short_window=5, long_window=20):
                       ) : message.isStockPicker ? (
                         <div className="max-w-4xl">
                           <div className="bg-white rounded-2xl px-4 py-3 shadow-sm mb-3">
-                            <div className="text-gray-900 whitespace-pre-line prose prose-sm max-w-none"><ReactMarkdown>{message.content}</ReactMarkdown></div>
+                            <MdContent>{message.content}</MdContent>
                           </div>
                           <StockPickerTable />
                         </div>
                       ) : (
                         <div className="bg-white rounded-2xl px-4 py-3 inline-block max-w-2xl shadow-sm">
-                          <div className="text-gray-900 prose prose-sm max-w-none"><ReactMarkdown>{message.content}</ReactMarkdown></div>
+                          <MdContent>{message.content}</MdContent>
                         </div>
                       )}
                     </div>

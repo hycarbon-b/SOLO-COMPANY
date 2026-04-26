@@ -157,7 +157,7 @@ export function AppShell() {
           style={{ background: 'var(--panel-muted)', border: '1px solid var(--panel-border)' }}
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-semibold">Solo Pro</span>
+            <span className="text-[11px] font-semibold">本月套餐</span>
             <span className="text-[10px] text-[color:var(--muted-foreground)]">62%</span>
           </div>
           <div className="progress-bar mb-1.5">
@@ -212,27 +212,7 @@ export function AppShell() {
 
           {/* Actions */}
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors"
-              title="搜索"
-            >
-              <Search className="h-4 w-4 text-[color:var(--muted-foreground)]" />
-            </button>
-            <button
-              className="relative h-8 w-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors"
-              title="通知"
-            >
-              <Bell className="h-4 w-4 text-[color:var(--muted-foreground)]" />
-              <span
-                className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full"
-                style={{ background: 'var(--accent)' }}
-              />
-            </button>
-            <div className="w-px h-5 bg-slate-200 mx-1" />
-            <button className="btn-primary">
-              <Plus className="h-3.5 w-3.5" />
-              新建创作
-            </button>
+            <button className="btn-primary">+ 新建创作</button>
             <div
               className="h-7 w-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
               style={{ background: 'var(--gradient-primary)' }}

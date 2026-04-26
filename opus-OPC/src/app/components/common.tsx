@@ -111,7 +111,7 @@ export function StatCard({
   value: ReactNode;
   delta?: string;
   accent?: string;
-  icon?: ComponentType<{ className?: string }>;
+  icon?: ComponentType<{ className?: string; style?: React.CSSProperties }>;
   accentColor?: string;
   live?: boolean;
 }) {

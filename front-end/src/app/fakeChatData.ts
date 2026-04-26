@@ -9,6 +9,8 @@ export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  /** 'text' = markdown (default) | 'html' = inline HTML card */
+  type?: 'text' | 'html';
   timestamp: Date;
   isStrategy?: boolean;
   isStockPicker?: boolean;

@@ -5,6 +5,7 @@ import {
 import { useState, useRef, useEffect, useCallback } from 'react';
 import * as React from 'react';
 import { callOpenClawGateway } from '../../services/openclawGateway';
+import { loadMessages, saveMessages, loadSysPrompt, saveSysPrompt } from '../../services/conversationStore';
 import chatConfig from '../config/chatConfig.json';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { ChatPanel } from './ChatPanel';
@@ -23,9 +24,9 @@ import { MarketPage } from './MarketPage';
 
 
 // === Tab Types ===
-type TabType = 'home' | 'files' | 'trading' | 'market' | 'agent' | 'schedule' | 'usage' | 'about' | 'chat' | 'web';
+export type TabType = 'home' | 'files' | 'trading' | 'market' | 'agent' | 'schedule' | 'usage' | 'about' | 'chat' | 'web';
 
-interface Tab {
+export interface Tab {
   id: string;           // unique tab id
   type: TabType;
   title: string;
@@ -38,168 +39,26 @@ interface MainContentProps {
   tasks: Array<{ id: string; title: string; time: string; status?: string; hasUnread?: boolean; pinned?: boolean }>;
   onUpdateTaskTitle: (taskId: string, newTitle: string) => void;
   onUpdateTaskStatus: (taskId: string, status: 'idle' | 'working' | 'completed' | 'error') => void;
-}
-
-// === Tab Icons (inline SVGs for consistency) ===
-const TAB_ICONS: Record<TabType, React.ReactNode> = {
-  home: <Home className="w-3.5 h-3.5 flex-shrink-0" />,
-  files: <FileText className="w-3.5 h-3.5 flex-shrink-0" />,
-  trading: <Table className="w-3.5 h-3.5 flex-shrink-0" />,
-  market: <TrendingUp className="w-3.5 h-3.5 flex-shrink-0" />,
-  agent: <Cpu className="w-3.5 h-3.5 flex-shrink-0" />,
-  schedule: <Activity className="w-3.5 h-3.5 flex-shrink-0" />,
-  usage: <HardDrive className="w-3.5 h-3.5 flex-shrink-0" />,
-  about: <FileText className="w-3.5 h-3.5 flex-shrink-0" />,
-  chat: <Target className="w-3.5 h-3.5 flex-shrink-0" />,
-  web: <Globe className="w-3.5 h-3.5 flex-shrink-0" />,
-};
-
-// === TabBar Component ===
-function TabBar({
-  tabs,
-  activeTabId,
-  onSelectTab,
-  onCloseTab,
-}: {
+  // Tab state managed externally (in App.tsx)
   tabs: Tab[];
   activeTabId: string;
-  onSelectTab: (id: string) => void;
-  onCloseTab: (id: string) => void;
-}) {
-  return (
-    <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-gray-100 bg-white overflow-x-auto scrollbar-none">
-      {tabs.map((tab) => {
-        const isActive = tab.id === activeTabId;
-        const isClosable = tab.type !== 'home';
-        return (
-          <div
-            key={tab.id}
-            className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs cursor-pointer transition-all flex-shrink-0 min-w-0 max-w-[160px] ${
-              isActive
-                ? 'bg-blue-50 border border-blue-100'
-                : 'text-gray-500 hover:bg-gray-50 border border-transparent'
-            }`}
-            onClick={() => onSelectTab(tab.id)}
-          >
-            <span className={isActive ? 'text-blue-600' : 'text-gray-400'}>
-              {TAB_ICONS[tab.type]}
-            </span>
-            <span className={`truncate ${isActive ? 'text-blue-700 font-medium' : 'text-gray-600'}`}>
-              {tab.title}
-            </span>
-            {isClosable && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onCloseTab(tab.id);
-                }}
-                className={`ml-0.5 p-0.5 rounded transition-colors flex-shrink-0 ${
-                  isActive
-                    ? 'text-blue-400 hover:bg-blue-100 hover:text-blue-600'
-                    : 'text-gray-300 hover:bg-gray-100 hover:text-gray-500'
-                }`}
-              >
-                <X className="w-3 h-3" />
-              </button>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
+  onOpenTab: (type: TabType, title: string, taskId?: string, url?: string) => void;
+  onCloseTab: (tabId: string) => void;
 }
 
-export function MainContent({ onAddTask, tasks, onUpdateTaskTitle, onUpdateTaskStatus }: MainContentProps) {
-  // === Tab State ===
-  const [tabs, setTabs] = useState<Tab[]>([
-    { id: 'home', type: 'home', title: '首页' },
-  ]);
-  const [activeTabId, setActiveTabId] = useState('home');
 
+
+
+export function MainContent({ onAddTask, tasks, onUpdateTaskTitle, onUpdateTaskStatus, tabs, activeTabId, onOpenTab, onCloseTab }: MainContentProps) {
+  // === Tab State ===
   // Derive the effective taskId from the active tab
   const activeTab = tabs.find(t => t.id === activeTabId);
   const effectiveTaskId = activeTab?.type === 'chat' ? activeTab.taskId ?? null : null;
 
-  // Sync tab changes back to Sidebar for highlight
-  useEffect(() => {
-    window.dispatchEvent(new CustomEvent('workbuddy:tab-changed', {
-      detail: { tabType: activeTab?.type ?? 'home' }
-    }));
-  }, [activeTabId, activeTab?.type]);
+  const handleOpenTab = onOpenTab;
+  const handleCloseTab = onCloseTab;
 
-  // === Sidebar interaction → open/switch tab ===
-  const handleOpenTab = (type: TabType, title: string, taskId?: string, url?: string) => {
-    // For chat tabs, key by taskId so the same task reuses the tab
-    // For web tabs, key by url so the same page reuses the tab
-    const tabKey =
-      type === 'chat' && taskId
-        ? `chat-${taskId}`
-        : type === 'web' && url
-          ? `web-${url}`
-          : type;
-
-    const existing = tabs.find(t =>
-      type === 'chat' && taskId
-        ? t.taskId === taskId
-        : type === 'web' && url
-          ? t.type === 'web' && t.url === url
-          : t.type === type
-    );
-    if (existing) {
-      setActiveTabId(existing.id);
-    } else {
-      const newTab: Tab = { id: tabKey, type, title, taskId, url };
-      setTabs(prev => [...prev, newTab]);
-      setActiveTabId(tabKey);
-    }
-  };
-
-  const handleCloseTab = (tabId: string) => {
-    const tab = tabs.find(t => t.id === tabId);
-    if (!tab || tab.type === 'home') return;
-    setTabs(prev => {
-      const idx = prev.findIndex(t => t.id === tabId);
-      const newTabs = prev.filter(t => t.id !== tabId);
-      // If closing active tab, navigate to prev tab or home
-      if (activeTabId === tabId) {
-        const targetIdx = Math.max(0, idx - 1);
-        setActiveTabId(newTabs[targetIdx]?.id ?? 'home');
-      }
-      return newTabs;
-    });
-  };
-
-  // Expose tab-open function via a ref/event so Sidebar can trigger it
-  // We'll use a global event approach via window
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent<{ tabType: TabType; title: string; taskId?: string; url?: string }>).detail;
-      // event type is 'workbuddy:open-tab'; detail contains { tabType, title, taskId, url }
-      handleOpenTab(detail.tabType, detail.title, detail.taskId, detail.url);
-    };
-    window.addEventListener('workbuddy:open-tab', handler);
-    return () => window.removeEventListener('workbuddy:open-tab', handler);
-  }, [tabs, activeTabId]);
-
-  // 监听 Electron 主进程通过 HTTP 发来的"打开网页 Tab"请求
-  useEffect(() => {
-    const api = (window as any).electronAPI;
-    if (!api?.onOpenWebTab) return;
-    const off = api.onOpenWebTab((data: { url: string }) => {
-      if (!data?.url) return;
-      let title = data.url;
-      try {
-        const u = new URL(data.url);
-        title = u.host + (u.pathname && u.pathname !== '/' ? u.pathname : '');
-      } catch { /* keep raw */ }
-      window.dispatchEvent(new CustomEvent('workbuddy:open-tab', {
-        detail: { tabType: 'web', title, url: data.url },
-      }));
-    });
-    return () => { if (typeof off === 'function') off(); };
-  }, []);
-
-  // === Chat State (same as before) ===
+  // === Chat State ===
   const [inputValue, setInputValue] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [attachedLibraryFiles, setAttachedLibraryFiles] = useState<LibraryFile[]>([]);
@@ -212,12 +71,63 @@ export function MainContent({ onAddTask, tasks, onUpdateTaskTitle, onUpdateTaskS
     : libraryFiles.filter(f => f.type === libraryActiveTab);
 
   const [messagesMap, setMessagesMap] = useState<Record<string, Message[]>>({
-  ...fakeMessagesMap,
-});
+    ...fakeMessagesMap,
+  });
 
   const [systemPromptsMap, setSystemPromptsMap] = useState<Record<string, string>>({});
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // === Persistence: load messages when a chat tab opens =====================
+  useEffect(() => {
+    if (!effectiveTaskId) return;
+    // Skip seed/fake tasks (numeric IDs) if already loaded
+    if (messagesMap[effectiveTaskId] !== undefined) return;
+    const stored = loadMessages(effectiveTaskId);
+    if (stored.length > 0) {
+      setMessagesMap(prev => ({
+        ...prev,
+        [effectiveTaskId]: stored.map(m => ({ ...m, timestamp: new Date(m.timestamp) })),
+      }));
+    }
+    // Load system prompt
+    const sp = loadSysPrompt(effectiveTaskId);
+    if (sp) {
+      setSystemPromptsMap(prev => ({ ...prev, [effectiveTaskId]: sp }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveTaskId]);
+
+  // === Persistence: save messages whenever they change =====================
+  // Only persist non-seed (non-numeric-short) task IDs to avoid filling storage with fake data
+  useEffect(() => {
+    Object.entries(messagesMap).forEach(([taskId, msgs]) => {
+      if (/^\d{1,2}$/.test(taskId)) return; // skip seed IDs ('1','2'...)
+      saveMessages(taskId, msgs.map(m => ({
+        ...m,
+        timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : String(m.timestamp),
+      })));
+    });
+  }, [messagesMap]);
+
+  // === Persistence: save system prompts whenever they change ================
+  useEffect(() => {
+    Object.entries(systemPromptsMap).forEach(([taskId, sp]) => {
+      if (/^\d{1,2}$/.test(taskId)) return;
+      saveSysPrompt(taskId, sp);
+    });
+  }, [systemPromptsMap]);
+
+  // === Global reset (from About page) =======================================
+  useEffect(() => {
+    const handler = () => {
+      setMessagesMap({ ...fakeMessagesMap });
+      setSystemPromptsMap({});
+      setInputValue('');
+    };
+    window.addEventListener('yuanji:reset-all', handler);
+    return () => window.removeEventListener('yuanji:reset-all', handler);
+  }, []);
 
   const messages = effectiveTaskId ? (messagesMap[effectiveTaskId] || []) : [];
   useEffect(() => {
@@ -349,6 +259,10 @@ export function MainContent({ onAddTask, tasks, onUpdateTaskTitle, onUpdateTaskS
       const activeSystemPrompt = taskIdToUse
         ? (systemPromptsMap[taskIdToUse] ?? chatConfig.defaultSystemPrompt)
         : chatConfig.defaultSystemPrompt;
+      // 替换对话ID placeholder
+      const finalSystemPrompt = taskIdToUse
+        ? activeSystemPrompt.replace('{{CONVERSATION_ID}}', taskIdToUse)
+        : activeSystemPrompt;
       const { text } = await callOpenClawGateway(
         userContent,
         (_chunk, accumulated, isNewSegment) => {
@@ -404,7 +318,7 @@ export function MainContent({ onAddTask, tasks, onUpdateTaskTitle, onUpdateTaskS
             };
           });
         },
-        activeSystemPrompt
+        finalSystemPrompt
       );
 
       // 流结束后用最终文本兜底（非流式时直接赋值）
@@ -691,18 +605,8 @@ export function MainContent({ onAddTask, tasks, onUpdateTaskTitle, onUpdateTaskS
   };
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      {/* Tab Bar */}
-      <TabBar
-        tabs={tabs}
-        activeTabId={activeTabId}
-        onSelectTab={(id) => setActiveTabId(id)}
-        onCloseTab={handleCloseTab}
-      />
-      {/* Tab Content */}
-      <div className="flex-1 overflow-hidden">
-        {renderContent()}
-      </div>
+    <div className="h-full overflow-hidden">
+      {renderContent()}
     </div>
   );
 }

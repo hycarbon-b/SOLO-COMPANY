@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "股票列表数据结构（表格样式）",
+  "description": "股票表格生成器的数据结构定义，样式参考 StockPickerTable",
+  "type": "object",
+  "required": ["stocks"],
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "报告标题",
+      "default": "智能选股推荐"
+    },
+    "subtitle": {
+      "type": "string",
+      "description": "报告副标题",
+      "default": "基于多因子模型综合评分，筛选出当前市场优质标的"
+    },
+    "stocks": {
+      "type": "array",
+      "description": "股票列表",
+      "items": {
+        "$ref": "#/definitions/Stock"
+      },
+      "minItems": 1
+    }
+  },
+  "definitions": {
+    "Stock": {
+      "type": "object",
+      "description": "单个股票信息",
+      "required": ["name", "code", "price", "change", "changePct", "reason"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "股票名称",
+          "minLength": 1
+        },
+        "code": {
+          "type": "string",
+          "description": "股票代码（6位数字）",
+          "pattern": "^[0-9]{6}$"
+        },
+        "price": {
+          "type": "string",
+          "description": "当前价格",
+          "pattern": "^[0-9]+(\\.[0-9]{1,2})?$"
+        },
+        "change": {
+          "type": "string",
+          "description": "涨跌额（含符号，如 +23.50 或 -2.10）",
+          "pattern": "^[+\\-][0-9]+(\\.[0-9]{1,2})?$"
+        },
+        "changePct": {
+          "type": "string",
+          "description": "涨跌百分比（含符号，不含%，如 +1.29 或 -1.23）",
+          "pattern": "^[+\\-][0-9]+(\\.[0-9]{1,2})?$"
+        },
+        "reason": {
+          "type": "string",
+          "description": "选股依据说明",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

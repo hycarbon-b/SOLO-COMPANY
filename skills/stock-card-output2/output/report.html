@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>智能选股推荐</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f1f5f9;
+    padding: 24px;
+    min-height: 100vh;
+  }
+  .wrapper {
+    max-width: 960px;
+    margin: 0 auto;
+  }
+  /* 卡片容器 */
+  .card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  /* 标题区 */
+  .card-header {
+    background: linear-gradient(to right, #eff6ff, #eef2ff);
+    padding: 12px 16px;
+  }
+  .card-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #111827;
+  }
+  .card-subtitle {
+    font-size: 0.875rem;
+    color: #4b5563;
+    margin-top: 4px;
+  }
+  /* 表格滚动容器 */
+  .table-scroll {
+    overflow-x: auto;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  /* 表头 */
+  thead {
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  th {
+    padding: 12px 16px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+  th.th-left  { text-align: left; }
+  th.th-right { text-align: right; }
+  /* 表体 */
+  tbody tr { border-bottom: 1px solid #f3f4f6; }
+  tbody tr:last-child { border-bottom: none; }
+  .table-row { transition: background-color 0.15s; }
+  .table-row:hover { background: #f9fafb; }
+  .td { padding: 12px 16px; vertical-align: middle; }
+  .td-right { text-align: right; }
+  /* 股票名称 */
+  .stock-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #111827;
+  }
+  /* 股票代码 */
+  .stock-code {
+    font-size: 0.875rem;
+    color: #4b5563;
+    font-family: "Courier New", Courier, monospace;
+  }
+  /* 价格 */
+  .price {
+    font-size: 0.875rem;
+    color: #111827;
+  }
+  /* 涨跌幅（A股：涨红跌绿） */
+  .color-up   { color: #dc2626; }
+  .color-down { color: #16a34a; }
+  .change-pct {
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+  }
+  .change-pct svg { flex-shrink: 0; }
+  .change-val {
+    font-size: 0.75rem;
+    margin-top: 2px;
+  }
+  .color-up  .change-val { color: #ef4444; }
+  .color-down .change-val { color: #22c55e; }
+  /* 选股依据 */
+  .reason {
+    font-size: 0.875rem;
+    color: #4b5563;
+    line-height: 1.5;
+  }
+  /* 底部免责声明 */
+  .card-footer {
+    padding: 10px 16px;
+    background: #f9fafb;
+    border-top: 1px solid #e5e7eb;
+  }
+  .disclaimer {
+    font-size: 0.75rem;
+    color: #9ca3af;
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">智能选股推荐</div>
+      <div class="card-subtitle">基于多因子模型综合评分，筛选出当前市场优质标的</div>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th class="th-left">股票名称</th>
+            <th class="th-left">代码</th>
+            <th class="th-right">现价</th>
+            <th class="th-right">涨跌幅</th>
+            <th class="th-left">选股依据</th>
+          </tr>
+        </thead>
+        <tbody>
+            <tr class="table-row">
+              <td class="td td-name">
+                <span class="stock-name">贵州茅台</span>
+              </td>
+              <td class="td td-code">
+                <span class="stock-code">600519</span>
+              </td>
+              <td class="td td-right">
+                <span class="price">¥1850.50</span>
+              </td>
+              <td class="td td-right">
+                <div class="change-pct color-up">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+  <polyline points="17 6 23 6 23 12"></polyline>
+</svg>
+                  <span>+1.29%</span>
+                </div>
+                <div class="change-val color-up">+23.50</div>
+              </td>
+              <td class="td td-reason">
+                <span class="reason">业绩稳健增长，市盈率处于历史低位，白酒行业龙头地位稳固</span>
+              </td>
+            </tr>
+            <tr class="table-row">
+              <td class="td td-name">
+                <span class="stock-name">宁德时代</span>
+              </td>
+              <td class="td td-code">
+                <span class="stock-code">300750</span>
+              </td>
+              <td class="td td-right">
+                <span class="price">¥168.30</span>
+              </td>
+              <td class="td td-right">
+                <div class="change-pct color-down">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline>
+  <polyline points="17 18 23 18 23 12"></polyline>
+</svg>
+                  <span>-1.23%</span>
+                </div>
+                <div class="change-val color-down">-2.10</div>
+              </td>
+              <td class="td td-reason">
+                <span class="reason">新能源电池全球市占率第一，技术领先，获多个大单订单</span>
+              </td>
+            </tr>
+            <tr class="table-row">
+              <td class="td td-name">
+                <span class="stock-name">比亚迪</span>
+              </td>
+              <td class="td td-code">
+                <span class="stock-code">002594</span>
+              </td>
+              <td class="td td-right">
+                <span class="price">¥245.80</span>
+              </td>
+              <td class="td td-right">
+                <div class="change-pct color-up">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+  <polyline points="17 6 23 6 23 12"></polyline>
+</svg>
+                  <span>+3.54%</span>
+                </div>
+                <div class="change-val color-up">+8.40</div>
+              </td>
+              <td class="td td-reason">
+                <span class="reason">新能源汽车销量持续突破，垂直整合优势明显，估值合理</span>
+              </td>
+            </tr>
+            <tr class="table-row">
+              <td class="td td-name">
+                <span class="stock-name">中国平安</span>
+              </td>
+              <td class="td td-code">
+                <span class="stock-code">601318</span>
+              </td>
+              <td class="td td-right">
+                <span class="price">¥45.60</span>
+              </td>
+              <td class="td td-right">
+                <div class="change-pct color-up">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+  <polyline points="17 6 23 6 23 12"></polyline>
+</svg>
+                  <span>+1.79%</span>
+                </div>
+                <div class="change-val color-up">+0.80</div>
+              </td>
+              <td class="td td-reason">
+                <span class="reason">保险业务稳定，科技金融转型成效显著，分红率高</span>
+              </td>
+            </tr>
+            <tr class="table-row">
+              <td class="td td-name">
+                <span class="stock-name">隆基绿能</span>
+              </td>
+              <td class="td td-code">
+                <span class="stock-code">601012</span>
+              </td>
+              <td class="td td-right">
+                <span class="price">¥23.50</span>
+              </td>
+              <td class="td td-right">
+                <div class="change-pct color-up">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+  <polyline points="17 6 23 6 23 12"></polyline>
+</svg>
+                  <span>+5.38%</span>
+                </div>
+                <div class="change-val color-up">+1.20</div>
+              </td>
+              <td class="td td-reason">
+                <span class="reason">光伏组件出货量全球领先，成本优势突出，新技术储备充足</span>
+              </td>
+            </tr>
+            <tr class="table-row">
+              <td class="td td-name">
+                <span class="stock-name">药明康德</span>
+              </td>
+              <td class="td td-code">
+                <span class="stock-code">603259</span>
+              </td>
+              <td class="td td-right">
+                <span class="price">¥78.90</span>
+              </td>
+              <td class="td td-right">
+                <div class="change-pct color-down">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline>
+  <polyline points="17 18 23 18 23 12"></polyline>
+</svg>
+                  <span>-1.87%</span>
+                </div>
+                <div class="change-val color-down">-1.50</div>
+              </td>
+              <td class="td td-reason">
+                <span class="reason">CRO行业龙头，订单饱满，全球医药外包趋势明显</span>
+              </td>
+            </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card-footer">
+      <p class="disclaimer">* 以上数据仅供参考，不构成投资建议。投资有风险，入市需谨慎。</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { Laptop, Cpu, HardDrive, Shield, RefreshCw, Copy, Check } from 'lucide-react';
+import { Laptop, Cpu, HardDrive, Shield, RefreshCw, Copy, Check, Trash2, AlertTriangle } from 'lucide-react';
 import { GatewayStatusPanel } from './GatewayStatusPanel';
+import { WsDebugPanel } from './WsDebugPanel';
+import { clearAll } from '../../services/conversationStore';
 
 export function AboutPage() {
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -206,11 +208,76 @@ export function AboutPage() {
           {/* Gateway Debug Panel */}
           <GatewayStatusPanel />
 
+          {/* WS Message Stream Debug Panel */}
+          <WsDebugPanel />
+
+          {/* Danger Zone */}
+          <DangerZone />
+
           {/* Footer Info */}
           <div className="text-center text-xs text-gray-400 pt-4 pb-2">
             YUANJI T v1.0.0 · © 2026 All Rights Reserved
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function DangerZone() {
+  const [confirming, setConfirming] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const handleReset = () => {
+    clearAll();
+    window.dispatchEvent(new CustomEvent('yuanji:do-reset'));
+    setConfirming(false);
+    setDone(true);
+    setTimeout(() => setDone(false), 3000);
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-red-100 overflow-hidden">
+      <div className="px-6 py-4 bg-red-50 border-b border-red-100">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="w-5 h-5 text-red-500" />
+          <h3 className="text-base font-semibold text-red-700">危险区域</h3>
+        </div>
+      </div>
+      <div className="p-6 flex items-center justify-between gap-4">
+        <div>
+          <div className="text-sm font-medium text-gray-800">重置所有对话历史</div>
+          <div className="text-xs text-gray-500 mt-0.5">删除本地存储的所有会话消息，此操作不可撤销</div>
+        </div>
+        {done ? (
+          <div className="flex items-center gap-1.5 text-emerald-600 text-sm font-medium">
+            <Check className="w-4 h-4" /> 已重置
+          </div>
+        ) : !confirming ? (
+          <button
+            onClick={() => setConfirming(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+            重置
+          </button>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">确认删除所有对话？</span>
+            <button
+              onClick={() => setConfirming(false)}
+              className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 text-sm hover:bg-gray-50 transition-colors"
+            >
+              取消
+            </button>
+            <button
+              onClick={handleReset}
+              className="px-3 py-1.5 rounded-lg bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition-colors"
+            >
+              确认重置
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

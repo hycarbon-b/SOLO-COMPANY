@@ -73,10 +73,10 @@ export function LibraryPage() {
             const cfg = TYPE_CONFIG[a.kind] ?? TYPE_CONFIG.doc;
             const Icon = cfg.icon;
             return (
-              <div key={a.id} className="panel-interactive group flex flex-col overflow-hidden">
+              <div key={a.id} className="panel p-3 group cursor-pointer flex flex-col overflow-hidden transition-shadow hover:shadow-md">
                 {/* Thumbnail / icon area */}
                 <div
-                  className="aspect-square flex flex-col items-center justify-center relative"
+                  className="aspect-square flex flex-col items-center justify-center relative rounded-lg overflow-hidden -mx-3 -mt-3 mb-0"
                   style={{ background: cfg.bg }}
                 >
                   <Icon className="h-12 w-12" style={{ color: cfg.color, opacity: 0.7 }} />
@@ -95,13 +95,13 @@ export function LibraryPage() {
                       className="text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider"
                       style={{ background: cfg.color, color: '#fff', opacity: 0.9 }}
                     >
-                      {KIND_LABEL[a.kind] ?? a.kind}
+                      {a.kind}
                     </span>
                   </div>
                 </div>
 
                 {/* Info */}
-                <div className="p-3">
+                <div className="pt-3">
                   <div className="text-[12px] font-medium truncate mb-1" title={a.name}>
                     {a.name}
                   </div>

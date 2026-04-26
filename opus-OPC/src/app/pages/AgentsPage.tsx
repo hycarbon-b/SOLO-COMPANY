@@ -227,9 +227,9 @@ export function AgentsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {agents.map((a) => {
             const statusCfg = {
-              running: { color: 'green' as const, label: '运行中', dot: true, ring: '#10b981' },
-              idle:    { color: 'gray'  as const, label: '空闲',   dot: false, ring: '#94a3b8' },
-              error:   { color: 'red'   as const, label: '错误',   dot: true,  ring: '#ef4444' },
+              running: { color: 'green' as const, label: 'running', dot: true, ring: '#10b981' },
+              idle:    { color: 'gray'  as const, label: 'idle',    dot: false, ring: '#94a3b8' },
+              error:   { color: 'red'   as const, label: 'error',   dot: true,  ring: '#ef4444' },
             }[a.status] ?? { color: 'gray' as const, label: a.status, dot: false, ring: '#94a3b8' };
 
             return (
