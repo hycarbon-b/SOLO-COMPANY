@@ -12,7 +12,7 @@ export function StreamingPage() {
     <div className="page-shell" data-testid="page-streaming">
       <div className="page-inner">
         <PageHeader
-          title="直播推流 Streaming"
+          title="直播推流"
           description="一次开播，多平台同步：管理 RTMP 目标、码率、弹幕。"
           actions={
             <button
@@ -20,8 +20,8 @@ export function StreamingPage() {
                 setLive(!live);
                 toast(live ? '已下播' : '已开播');
               }}
-              className="text-xs px-3 py-1.5 rounded-lg text-white flex items-center gap-1.5"
-              style={{ background: live ? 'var(--destructive)' : 'var(--success)' }}
+              className="btn-primary"
+              style={{ background: live ? 'var(--destructive)' : 'var(--success)', boxShadow: live ? '0 1px 4px rgba(239,68,68,0.30)' : '0 1px 4px rgba(16,185,129,0.30)' }}
             >
               <Radio className="h-3.5 w-3.5" />
               {live ? '结束直播' : '开始直播'}
@@ -43,7 +43,7 @@ export function StreamingPage() {
 
         <div className="panel p-5">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold">推流目标</h3>
+            <h3 className="text-[13px] font-semibold">推流目标</h3>
             <button className="text-xs text-[color:var(--primary)]">+ 添加平台</button>
           </div>
           <div className="space-y-3">

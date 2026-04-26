@@ -5,7 +5,7 @@ export function SettingsPage() {
   return (
     <div className="page-shell" data-testid="page-settings">
       <div className="page-inner">
-        <PageHeader title="设置 Settings" description="平台账号 · API Key · 品牌资料。" />
+        <PageHeader title="设置" description="平台账号 · API Key · 品牌资料。" />
 
         <div className="panel p-5">
           <h3 className="text-sm font-semibold mb-3">已绑定平台</h3>
@@ -30,8 +30,8 @@ export function SettingsPage() {
                 </div>
                 <Badge color={i < 4 ? 'green' : 'gray'}>{i < 4 ? 'connected' : 'disconnected'}</Badge>
                 <button
-                  className="text-xs px-3 py-1 rounded-lg border"
-                  style={{ borderColor: 'var(--panel-border)' }}
+                  className="btn-secondary"
+                  style={{ padding: '4px 10px', fontSize: 12 }}
                 >
                   {i < 4 ? '重新授权' : '立即授权'}
                 </button>

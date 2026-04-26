@@ -40,13 +40,14 @@ export function StudioPage() {
     <div className="page-shell" data-testid="page-studio">
       <div className="page-inner">
         <PageHeader
-          title="内容创作 Studio"
+          title="内容创作"
           description="左侧 Brief · 中间编辑器 · 右侧 Agent 协作。"
           actions={
             <button
               onClick={() => toast.success('草稿已保存')}
-              className="text-xs px-3 py-1.5 rounded-lg border"
-              style={{ borderColor: 'var(--panel-border)' }}
+              className="btn-secondary"
+              style={{ fontSize: 12 }}>
+              保存草稿
             >
               保存草稿
             </button>

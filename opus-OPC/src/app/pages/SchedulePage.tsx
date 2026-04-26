@@ -6,7 +6,7 @@ export function SchedulePage() {
     <div className="page-shell" data-testid="page-schedule">
       <div className="page-inner">
         <PageHeader
-          title="排程日历 Schedule"
+          title="排程日历"
           description="周视图 · 拖拽调整发布时间（mock）。"
         />
 
