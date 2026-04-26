@@ -1,16 +1,18 @@
 import {
-  Paperclip, Mic, ArrowUp, Target, TrendingUp, Activity, Cpu, X, FileText,
-  Image as ImageIcon, HardDrive, Upload, Table, Plus, Home, Globe
+  Mic, ArrowUp, Target, TrendingUp, Activity, Cpu, X, FileText,
+  Image as ImageIcon, HardDrive, Upload, Table, Home, Globe
 } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import * as React from 'react';
 import { callOpenClawGateway } from '../../services/openclawGateway';
+import chatConfig from '../config/chatConfig.json';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { ChatPanel } from './ChatPanel';
+import { FileLibraryModal } from './FileLibraryModal';
 import { RightPanelContainer } from './RightPanelContainer';
 import { FilesPage } from './FilesPage';
 import { TradingPage } from './TradingPage';
-import { AgentPage } from './AgentPage';
+import { AgentPage, type AgentInfo } from './AgentPage';
 import type { DiscussionThread } from '../../types/discussion';
 import type { Message, LibraryFile } from '../fakeChatData';
 import { libraryFiles, fakeMessagesMap } from '../fakeChatData';
@@ -18,7 +20,6 @@ import { UsagePage } from './UsagePage';
 import { AboutPage } from './AboutPage';
 import { SchedulePage } from './SchedulePage';
 import { MarketPage } from './MarketPage';
-import { StrategyCard } from './StrategyCard';
 
 
 // === Tab Types ===
@@ -30,13 +31,10 @@ interface Tab {
   title: string;
   taskId?: string;      // for chat tabs
   url?: string;         // for web tabs
-  icon?: React.ReactNode;
 }
 
 interface MainContentProps {
   onAddTask: (title: string) => string;
-  currentTaskId: string | null;
-  selectedMenu: string;
   tasks: Array<{ id: string; title: string; time: string; status?: string; hasUnread?: boolean; pinned?: boolean }>;
   onUpdateTaskTitle: (taskId: string, newTitle: string) => void;
   onUpdateTaskStatus: (taskId: string, status: 'idle' | 'working' | 'completed' | 'error') => void;
@@ -111,7 +109,7 @@ function TabBar({
   );
 }
 
-export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onUpdateTaskTitle, onUpdateTaskStatus }: MainContentProps) {
+export function MainContent({ onAddTask, tasks, onUpdateTaskTitle, onUpdateTaskStatus }: MainContentProps) {
   // === Tab State ===
   const [tabs, setTabs] = useState<Tab[]>([
     { id: 'home', type: 'home', title: '首页' },
@@ -130,7 +128,6 @@ export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onU
   }, [activeTabId, activeTab?.type]);
 
   // === Sidebar interaction → open/switch tab ===
-  // This replaces direct selectedMenu navigation with tab-based navigation
   const handleOpenTab = (type: TabType, title: string, taskId?: string, url?: string) => {
     // For chat tabs, key by taskId so the same task reuses the tab
     // For web tabs, key by url so the same page reuses the tab
@@ -210,8 +207,6 @@ export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onU
   const [libraryActiveTab, setLibraryActiveTab] = useState('全部');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const libraryTabs = ['全部', '文档', '幻灯片', '表格', '图片与视频', '策略代码', '更多'];
-
   const filteredLibraryFiles = libraryActiveTab === '全部'
     ? libraryFiles
     : libraryFiles.filter(f => f.type === libraryActiveTab);
@@ -220,13 +215,11 @@ export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onU
   ...fakeMessagesMap,
 });
 
+  const [systemPromptsMap, setSystemPromptsMap] = useState<Record<string, string>>({});
   const [isTyping, setIsTyping] = useState(false);
-  const [messageSentTrigger, setMessageSentTrigger] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const messages = effectiveTaskId ? (messagesMap[effectiveTaskId] || []) : [];
-  const currentTask = tasks.find(t => t.id === effectiveTaskId);
-
   useEffect(() => {
     if (effectiveTaskId === null) {
       setIsTyping(false);
@@ -241,14 +234,11 @@ export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onU
     }
   }, [isTyping, effectiveTaskId]);
 
-  const handleAgentStartChat = (thread: DiscussionThread) => {
-    const { startRecord } = thread
-    const title = `${startRecord.worker_label} - ${startRecord.worker_name}`
+  const handleAgentStartChat = (agent: AgentInfo) => {
+    const title = `${agent.role} · ${agent.name}`
     const taskId = onAddTask(title)
-    
-    // Create initial message with task context
-    const welcomeMessage = `**任务目标：** ${startRecord.task_objective}\n\n${startRecord.task_context ? '**背景信息：** ' + startRecord.task_context + '\n\n' : ''}您可以继续提问或要求我执行相关操作。`
-    
+    const welcomeMessage = `您好，我是${agent.name}，当前担任${agent.role}。我会先帮您快速梳理目标、关键数据和预期产出，再给出可执行建议。您可以直接告诉我想分析的市场、标的、策略，或把相关文件发给我，我会立即开始。`
+
     setMessagesMap(prev => ({
       ...prev,
       [taskId]: [
@@ -260,7 +250,11 @@ export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onU
         }
       ]
     }))
-    
+
+    if (agent.systemPrompt) {
+      setSystemPromptsMap(prev => ({ ...prev, [taskId]: agent.systemPrompt }))
+    }
+
     onUpdateTaskStatus(taskId, 'idle')
     handleOpenTab('chat', title, taskId)
   }
@@ -321,7 +315,6 @@ export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onU
     setInputValue('');
     setAttachedFiles([]);
     setAttachedLibraryFiles([]);
-    setMessageSentTrigger(prev => prev + 1);
 
     if (taskIdToUse) {
       setMessagesMap(prev => ({
@@ -331,7 +324,7 @@ export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onU
       onUpdateTaskStatus(taskIdToUse, 'working');
     }
 
-    setIsTyping(true);
+          <RightPanelContainer onAgentTaskComplete={handleAgentTaskComplete} />
 
     // 创建一个唯一的助手消息ID用于流式更新
     const assistantMsgId = `${Date.now()}-assistant-${Math.random().toString(36).slice(2, 9)}`;
@@ -350,11 +343,19 @@ export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onU
       });
     }
 
+    setIsTyping(true);
+
     try {
+      const activeSystemPrompt = taskIdToUse
+        ? (systemPromptsMap[taskIdToUse] ?? chatConfig.defaultSystemPrompt)
+        : chatConfig.defaultSystemPrompt;
       const { text } = await callOpenClawGateway(
         userContent,
         (_chunk, accumulated, isNewSegment) => {
           if (!taskIdToUse) return;
+
+          // 首个数据块到达时关闭加载气泡
+          setIsTyping(false);
 
           // 当 Gateway 开始一个新的流式分段时，把当前气泡定格，
           // 并为新的分段创建一个全新的助手气泡。
@@ -402,7 +403,8 @@ export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onU
               [taskIdToUse!]: updatedMessages,
             };
           });
-        }
+        },
+        activeSystemPrompt
       );
 
       // 流结束后用最终文本兜底（非流式时直接赋值）
@@ -489,17 +491,6 @@ export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onU
     setAttachedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  const getFileIcon = (file: File) => {
-    if (file.type.startsWith('image/')) return ImageIcon;
-    return FileText;
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-  };
-
   const handleSelectLibraryFile = (file: LibraryFile) => {
     if (!attachedLibraryFiles.find(f => f.id === file.id)) {
       setAttachedLibraryFiles(prev => [...prev, file]);
@@ -543,8 +534,7 @@ export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onU
 
   const renderHomeContent = () => (
     <main className="h-full flex overflow-hidden bg-white">
-      {messages.length === 0 && effectiveTaskId === null ? (
-        <div className="flex-1 flex flex-col items-center justify-center px-6 bg-white">
+      <div className="flex-1 flex flex-col items-center justify-center px-6 bg-white">
           <div className="w-full max-w-3xl">
             <h1 className="text-4xl text-center mb-12 text-gray-900">我能为你做什么？</h1>
             <div className="relative mb-6">
@@ -553,13 +543,19 @@ export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onU
                   <div className="px-4 pt-4 pb-2">
                     <div className="flex flex-wrap gap-2">
                       {attachedFiles.map((file, index) => {
-                        const FileIcon = getFileIcon(file);
+                        const FileIcon = file.type.startsWith('image/') ? ImageIcon : FileText;
                         return (
                           <div key={`local-${index}`} className="flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-2 group">
                             <FileIcon className="w-4 h-4 text-blue-600 flex-shrink-0" />
                             <div className="flex flex-col min-w-0">
                               <span className="text-sm text-gray-900 truncate max-w-[150px]">{file.name}</span>
-                              <span className="text-xs text-gray-500">{formatFileSize(file.size)}</span>
+                              <span className="text-xs text-gray-500">
+                                {file.size < 1024
+                                  ? `${file.size} B`
+                                  : file.size < 1024 * 1024
+                                    ? `${(file.size / 1024).toFixed(1)} KB`
+                                    : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}
+                              </span>
                             </div>
                             <button onClick={() => handleRemoveFile(index)} className="p-1 hover:bg-blue-100 rounded transition-colors flex-shrink-0">
                               <X className="w-3 h-3 text-gray-500" />
@@ -632,10 +628,16 @@ export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onU
             </div>
           </div>
         </div>
-      ) : (
-        renderChatContent(effectiveTaskId)
+      {showFileLibrary && (
+        <FileLibraryModal
+          libraryActiveTab={libraryActiveTab}
+          attachedLibraryFiles={attachedLibraryFiles}
+          filteredLibraryFiles={filteredLibraryFiles}
+          onTabChange={setLibraryActiveTab}
+          onSelectLibraryFile={handleSelectLibraryFile}
+          onClose={() => setShowFileLibrary(false)}
+        />
       )}
-      {showFileLibrary && renderFileLibraryModal()}
     </main>
   );
 
@@ -682,83 +684,11 @@ export function MainContent({ onAddTask, currentTaskId, selectedMenu, tasks, onU
             />
           </Panel>
           <PanelResizeHandle className="w-1 bg-gray-200 hover:bg-blue-400 transition-colors cursor-col-resize" />
-          <RightPanelContainer onMessageSent={messageSentTrigger} onAgentTaskComplete={handleAgentTaskComplete} />
+          <RightPanelContainer onAgentTaskComplete={handleAgentTaskComplete} />
         </PanelGroup>
-        {showFileLibrary && renderFileLibraryModal()}
       </main>
     );
   };
-
-  const renderFileLibraryModal = () => (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={() => setShowFileLibrary(false)}>
-      <div className="bg-white rounded-2xl shadow-2xl w-[90%] max-w-3xl max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-900">从文件库添加</h3>
-          <button onClick={() => setShowFileLibrary(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
-        </div>
-        <div className="px-6 py-3 border-b border-gray-100">
-          <div className="flex gap-2 flex-wrap">
-            {libraryTabs.map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setLibraryActiveTab(tab)}
-                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
-                  libraryActiveTab === tab ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="grid grid-cols-1 gap-3">
-            {filteredLibraryFiles.length === 0 ? (
-              <div className="text-center py-8 text-gray-400 text-sm">暂无{libraryActiveTab}文件</div>
-            ) : (
-              filteredLibraryFiles.map((file) => {
-                const isSelected = attachedLibraryFiles.find(f => f.id === file.id);
-                const FileIcon = file.icon;
-                return (
-                  <div
-                    key={file.id}
-                    onClick={() => handleSelectLibraryFile(file)}
-                    className={`flex items-center gap-3 p-4 rounded-lg cursor-pointer transition-all ${
-                      isSelected ? 'bg-blue-100 border-2 border-blue-500' : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent'
-                    }`}
-                  >
-                    <div className={`w-10 h-10 rounded-lg bg-white flex items-center justify-center flex-shrink-0 ${file.color}`}>
-                      <FileIcon className="w-5 h-5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-gray-900 truncate">{file.name}</div>
-                      <div className="text-xs text-gray-500 mt-0.5">{file.size} · {file.date}</div>
-                    </div>
-                    {isSelected && (
-                      <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
-                        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-        <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
-          <div className="text-sm text-gray-500">已选择 {attachedLibraryFiles.length} 个文件</div>
-          <div className="flex gap-2">
-            <button onClick={() => setShowFileLibrary(false)} className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">取消</button>
-            <button onClick={() => setShowFileLibrary(false)} className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 rounded-lg transition-colors">确定</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 
   return (
     <div className="h-full flex flex-col overflow-hidden">

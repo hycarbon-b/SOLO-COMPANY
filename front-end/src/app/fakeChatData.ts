@@ -4,7 +4,6 @@
  */
 
 import { FileText, Table, Image as ImageIcon } from 'lucide-react';
-import type { DiscussionThread } from '../../types/discussion';
 
 export interface Message {
   id: string;
@@ -24,6 +23,8 @@ export interface LibraryFile {
   icon: typeof FileText;
   color: string;
 }
+
+export const LIBRARY_TABS = ['全部', '文档', '幻灯片', '表格', '图片与视频', '策略代码', '更多'] as const;
 
 export const libraryFiles: LibraryFile[] = [
   { id: '1', name: '股票分析报告.pdf', size: '2.3 MB', date: '2026-04-20', type: '文档', icon: FileText, color: 'text-red-600' },

@@ -4,27 +4,23 @@
 
 完整闭环流程：
   1. 拉取真实行情数据（baostock / akshare / yfinance 自动选择）
-  2. 计算策略信号（ma_cross / rsi / breakout / macd / boll / momentum）
+  2. 加载策略文件并计算信号（通过 --strategy-file 指定 .py 文件）
   3. 向量化回测（含手续费、滑点、止损）
   4. 生成自包含 HTML 报告（净值曲线、月度热力图、交易明细）
 
 用法：
-  python run_pipeline.py --symbol 600519.SH --strategy ma_cross --output ./reports
+  python run_pipeline.py --symbol 600519.SH --strategy-file strategies/my_strategy.py --output ./reports
 
-  python run_pipeline.py --symbol 0700.HK --strategy rsi --start 2021-01-01 --output /tmp
+  python run_pipeline.py --symbol 0700.HK --strategy-file strategies/rsi_boll.py --start 2021-01-01 --output /tmp
 
-  python run_pipeline.py --random 2 --strategy macd --output ./reports
-
-  # 显示所有可用策略
-  python run_pipeline.py --list-strategies
+  python run_pipeline.py --random 2 --strategy-file strategies/ema_atr_trend.py --output ./reports
 """
 
 from __future__ import annotations
 import sys
 import argparse
-import importlib.util
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # 确保脚本目录在 sys.path（支持从任何目录调用）
 _SCRIPTS_DIR = Path(__file__).resolve().parent
@@ -33,7 +29,8 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from fetch_data import fetch_data, get_random_symbols
 from strategies import (
-    STRATEGIES, STRATEGY_DEFAULT_PARAMS, get_strategy, get_strategy_label
+    STRATEGIES, STRATEGY_DEFAULT_PARAMS, get_strategy, get_strategy_label,
+    load_strategy_file,
 )
 from backtest_engine import run_backtest
 from report_generator import generate_report
@@ -45,10 +42,9 @@ def parse_args():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
-  %(prog)s --symbol 600519.SH --strategy ma_cross --output ./reports
-  %(prog)s --symbol 0700.HK --strategy rsi --start 2021-01-01 --end 2024-12-31
-  %(prog)s --random 2 --strategy macd --output /tmp/reports
-  %(prog)s --list-strategies
+  %(prog)s --symbol 600519.SH --strategy-file strategies/my_strategy.py --output ./reports
+  %(prog)s --symbol 0700.HK --strategy-file strategies/rsi_boll.py --start 2021-01-01 --end 2024-12-31
+  %(prog)s --random 2 --strategy-file strategies/ema_atr_trend.py --output /tmp/reports
         """
     )
 
@@ -62,11 +58,10 @@ def parse_args():
     ap.add_argument("--end",   default=datetime.today().strftime("%Y-%m-%d"), help="结束日期（默认今天）")
 
     # 策略
-    ap.add_argument("--strategy",  default="ma_cross",
-                    choices=list(STRATEGIES.keys()),
-                    help=f"策略名称（默认 ma_cross）")
+    ap.add_argument("--strategy-file", required=True, metavar="FILE",
+                    help="策略 Python 文件路径（详见 SKILL.md '自定义策略' 节）")
     ap.add_argument("--params",    type=str, default=None,
-                    help='策略参数 JSON，如 \'{"fast_period":5,"slow_period":30}\'')
+                    help='覆盖策略默认参数，JSON 格式，如 \'{"fast_period":5}\'')
 
     # 回测参数
     ap.add_argument("--capital",    type=float, default=100_000.0, help="初始资金（默认 100000）")
@@ -81,9 +76,6 @@ def parse_args():
                     help="数据缓存目录（可选，跳过重复下载）")
     ap.add_argument("--open",   action="store_true",
                     help="生成后自动在浏览器打开报告")
-
-    # 辅助
-    ap.add_argument("--list-strategies", action="store_true", help="列出所有可用策略并退出")
 
     return ap.parse_args()
 
@@ -164,15 +156,13 @@ def run_single(
 def main():
     args = parse_args()
 
-    # --list-strategies
-    if args.list_strategies:
-        print("\n可用策略：\n")
-        for name, defaults in STRATEGY_DEFAULT_PARAMS.items():
-            label = get_strategy_label(name, defaults)
-            print(f"  {name:<12}  {label}")
-            dp = "  ".join(f"{k}={v}" for k, v in defaults.items())
-            print(f"               默认参数: {dp}\n")
-        return
+    # 加载策略文件
+    try:
+        strategy_name, _, _, _ = load_strategy_file(args.strategy_file)
+    except (FileNotFoundError, ValueError, ImportError) as e:
+        print(f"[error] 加载策略文件失败: {e}")
+        sys.exit(1)
+    print(f"[strategy] 已加载: {strategy_name}  来源: {args.strategy_file}")
 
     # 解析自定义参数
     if args.params:
@@ -210,7 +200,7 @@ def main():
                 symbol=symbol,
                 start=args.start,
                 end=args.end,
-                strategy_name=args.strategy,
+                strategy_name=strategy_name,
                 params=custom_params,
                 capital=args.capital,
                 commission=args.commission,

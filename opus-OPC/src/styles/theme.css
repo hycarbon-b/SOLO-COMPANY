@@ -1,0 +1,67 @@
+:root {
+  --background: #ffffff;
+  --foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --primary: #4f46e5;
+  --primary-foreground: #ffffff;
+  --accent: #ec4899;
+  --accent-foreground: #ffffff;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --destructive: #ef4444;
+  --border: rgba(15, 23, 42, 0.07);
+  --ring: #6366f1;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+
+  /* App surfaces */
+  --app-background: #f3f5fb;
+  --panel-background: rgba(255, 255, 255, 0.94);
+  --panel-strong: #ffffff;
+  --panel-muted: #f8fafc;
+  --panel-border: rgba(15, 23, 42, 0.07);
+
+  /* Layered shadow system */
+  --panel-shadow:       0 1px 2px rgba(15,23,42,0.04),
+                        0 3px 12px rgba(15,23,42,0.04);
+  --panel-shadow-md:    0 2px 6px rgba(15,23,42,0.05),
+                        0 8px 24px rgba(15,23,42,0.06);
+  --panel-shadow-lg:    0 4px 12px rgba(15,23,42,0.06),
+                        0 16px 48px rgba(15,23,42,0.08);
+  --panel-hover-shadow: 0 4px 20px rgba(99,102,241,0.13),
+                        0 2px 6px rgba(15,23,42,0.05);
+  --modal-shadow:       0 20px 60px rgba(15,23,42,0.18),
+                        0 4px 16px rgba(15,23,42,0.10);
+
+  /* Navigation */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0f172a;
+  --sidebar-width: 232px;
+  --sidebar-active: #eef2ff;
+  --sidebar-active-foreground: #4338ca;
+  --sidebar-section-label: #94a3b8;
+
+  /* Status semantics */
+  --status-running: #10b981;
+  --status-running-bg: #ecfdf5;
+  --status-idle: #94a3b8;
+  --status-idle-bg: #f8fafc;
+  --status-error: #ef4444;
+  --status-error-bg: #fef2f2;
+  --status-live: #f59e0b;
+  --status-live-bg: #fffbeb;
+
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #6366f1 0%, #818cf8 100%);
+  --gradient-accent:  linear-gradient(135deg, #ec4899 0%, #f43f5e 100%);
+  --gradient-brand:   linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #ec4899 100%);
+  --gradient-success: linear-gradient(135deg, #10b981, #059669);
+  --gradient-warm:    linear-gradient(135deg, #f59e0b, #ef4444);
+
+  /* Transitions */
+  --t-fast: 100ms ease;
+  --t-base: 180ms ease;
+  --t-slow: 280ms ease;
+}

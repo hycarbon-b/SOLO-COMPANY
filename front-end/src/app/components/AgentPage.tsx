@@ -1,71 +1,7 @@
 import { User, MessageSquare } from 'lucide-react';
+import { agents, type AgentInfo } from '../config/agentsConfig';
 
-const agents = [
-  {
-    id: 'data-analyst',
-    name: '李明',
-    role: '数据分析师',
-    description: '擅长市场数据分析和趋势预测',
-    avatarBg: 'bg-gradient-to-br from-blue-400 to-blue-600',
-    bgColor: 'bg-blue-100',
-    textColor: 'text-blue-600',
-  },
-  {
-    id: 'news-analyst',
-    name: '王芳',
-    role: '新闻分析师',
-    description: '实时追踪财经新闻和市场情绪',
-    avatarBg: 'bg-gradient-to-br from-purple-400 to-purple-600',
-    bgColor: 'bg-purple-100',
-    textColor: 'text-purple-600',
-  },
-  {
-    id: 'market-interpreter',
-    name: '张伟',
-    role: '行情解读员',
-    description: '提供专业的技术分析和交易建议',
-    avatarBg: 'bg-gradient-to-br from-green-400 to-green-600',
-    bgColor: 'bg-green-100',
-    textColor: 'text-green-600',
-  },
-  {
-    id: 'strategy-advisor',
-    name: '刘洋',
-    role: '策略顾问',
-    description: '制定量化交易策略和风险管理',
-    avatarBg: 'bg-gradient-to-br from-orange-400 to-orange-600',
-    bgColor: 'bg-orange-100',
-    textColor: 'text-orange-600',
-  },
-  {
-    id: 'risk-manager',
-    name: '陈静',
-    role: '风险管理师',
-    description: '评估投资风险和资金管理',
-    avatarBg: 'bg-gradient-to-br from-red-400 to-red-600',
-    bgColor: 'bg-red-100',
-    textColor: 'text-red-600',
-  },
-  {
-    id: 'market-researcher',
-    name: '赵强',
-    role: '市场研究员',
-    description: '深度研究行业和公司基本面',
-    avatarBg: 'bg-gradient-to-br from-indigo-400 to-indigo-600',
-    bgColor: 'bg-indigo-100',
-    textColor: 'text-indigo-600',
-  },
-];
-
-export interface AgentInfo {
-  id: string;
-  name: string;
-  role: string;
-  description: string;
-  avatarBg: string;
-  bgColor: string;
-  textColor: string;
-}
+export type { AgentInfo };
 
 interface AgentPageProps {
   onStartChat: (agent: AgentInfo) => void;

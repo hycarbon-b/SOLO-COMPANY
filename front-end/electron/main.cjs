@@ -214,46 +214,56 @@ ipcMain.handle('discussion:list', async () => {
       }
     }
     
-    // Pair start/end records into threads
+    // Two-pass pairing: collect starts first, then match ends regardless of file order
     const threads = []
-    const startMap = new Map() // skill_id + task_objective -> start record
-    
+    const startMap = new Map() // key -> start entry
+    const endMap = new Map()   // key -> end entry
+
     for (const entry of entries) {
       const key = entry.skill_id + '|' + (entry.task_objective || '')
-        if (entry.event === 'start') {
-        startMap.set(key, entry)
-        } else if (entry.event === 'end' && startMap.has(key)) {
-        const start = startMap.get(key)
-          const startTime = new Date(start.timestamp)
-          const endTime = new Date(entry.timestamp)
-          threads.push({
-            id: key,
-            skill_id: entry.skill_id,
-            startRecord: {
-              worker_label: start.worker_label,
-              worker_name: start.worker_name,
-              task_objective: start.task_objective,
-              timestamp: start.timestamp,
-              skill_id: start.skill_id,
-            },
-            endRecord: {
-              status: entry.status || 'success',
-              summary: entry.summary || '',
-              timestamp: entry.timestamp,
-            },
-            startTime,
-            endTime,
-            isActive: false,
-            duration: endTime - startTime,
-          })
-        startMap.delete(key)
+      if (entry.event === 'start') {
+        // Keep the latest start record if duplicates exist
+        const existing = startMap.get(key)
+        if (!existing || entry.timestamp > existing.timestamp) {
+          startMap.set(key, entry)
+        }
+      } else if (entry.event === 'end') {
+        // Keep the latest end record if duplicates exist
+        const existing = endMap.get(key)
+        if (!existing || entry.timestamp > existing.timestamp) {
+          endMap.set(key, entry)
+        }
       }
     }
-    
-      // Add unpaired starts as incomplete (active)
-    for (const [, start] of startMap) {
+
+    for (const [key, start] of startMap) {
+      const end = endMap.get(key)
+      if (end) {
+        const startTime = new Date(start.timestamp)
+        const endTime = new Date(end.timestamp)
         threads.push({
-          id: start.skill_id + '|' + (start.task_objective || ''),
+          id: key,
+          skill_id: start.skill_id,
+          startRecord: {
+            worker_label: start.worker_label,
+            worker_name: start.worker_name,
+            task_objective: start.task_objective,
+            timestamp: start.timestamp,
+            skill_id: start.skill_id,
+          },
+          endRecord: {
+            status: end.status || 'success',
+            summary: end.summary || '',
+            timestamp: end.timestamp,
+          },
+          startTime,
+          endTime,
+          isActive: false,
+          duration: endTime - startTime,
+        })
+      } else {
+        threads.push({
+          id: key,
           skill_id: start.skill_id,
           startRecord: {
             worker_label: start.worker_label,
@@ -268,6 +278,7 @@ ipcMain.handle('discussion:list', async () => {
           isActive: true,
           duration: null,
         })
+      }
     }
     
     debug('Found', threads.length, 'discussion threads')

@@ -10,20 +10,16 @@ interface SidebarProps {
   onMarkAsRead: (taskId: string) => void;
   currentTaskId: string | null;
   setCurrentTaskId: (taskId: string | null) => void;
-  selectedMenu: string;
-  setSelectedMenu: (menu: string) => void;
 }
 
-export function Sidebar({ tasks, onDeleteTask, onTogglePin, onMarkAsRead, currentTaskId, setCurrentTaskId, selectedMenu, setSelectedMenu }: SidebarProps) {
+export function Sidebar({ tasks, onDeleteTask, onTogglePin, onMarkAsRead, currentTaskId, setCurrentTaskId }: SidebarProps) {
   const [activeTabType, setActiveTabType] = useState<string>('home');
 
   // Listen to tab changes from MainContent to sync sidebar highlight
   useEffect(() => {
     const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (detail?.type === 'tab-changed') {
-        setActiveTabType(detail.tabType ?? 'home');
-      }
+      const detail = (e as CustomEvent<{ tabType?: string }>).detail;
+      setActiveTabType(detail?.tabType ?? 'home');
     };
     window.addEventListener('workbuddy:tab-changed', handler);
     return () => window.removeEventListener('workbuddy:tab-changed', handler);
@@ -37,20 +33,11 @@ export function Sidebar({ tasks, onDeleteTask, onTogglePin, onMarkAsRead, curren
     }));
   };
 
-  useEffect(() => {
-    if (currentTaskId !== null) {
-      setSelectedMenu('');
-    } else {
-      setSelectedMenu('new-work');
-    }
-  }, [currentTaskId]);
-
   const handleDeleteTask = (taskId: string) => {
     onDeleteTask(taskId);
     setContextMenu(null);
     const remainingTasks = tasks.filter(task => task.id !== taskId);
     if (remainingTasks.length === 0) {
-      setSelectedMenu('new-work');
       setCurrentTaskId(null);
     }
   };
@@ -92,6 +79,7 @@ export function Sidebar({ tasks, onDeleteTask, onTogglePin, onMarkAsRead, curren
               activeTabType === 'home' ? 'bg-gray-100 text-gray-900' : 'text-gray-700 hover:bg-gray-100'
             }`}
             onClick={() => {
+              setCurrentTaskId(null);
               openTab('home', '首页');
             }}
           >
@@ -107,7 +95,10 @@ export function Sidebar({ tasks, onDeleteTask, onTogglePin, onMarkAsRead, curren
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all mt-1 ${
                   activeTabType === item.tabType ? 'bg-gray-100 text-gray-900' : 'text-gray-700 hover:bg-gray-100'
                 }`}
-                onClick={() => openTab(item.tabType, item.label)}
+                onClick={() => {
+                  setCurrentTaskId(null);
+                  openTab(item.tabType, item.label);
+                }}
               >
                 <Icon className="w-4 h-4 flex-shrink-0" />
                 <span className="text-sm">{item.label}</span>
@@ -127,6 +118,7 @@ export function Sidebar({ tasks, onDeleteTask, onTogglePin, onMarkAsRead, curren
                   : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
               }`}
               onClick={() => {
+                setCurrentTaskId(null);
                 openTab('home', '首页');
               }}
             >
@@ -152,12 +144,11 @@ export function Sidebar({ tasks, onDeleteTask, onTogglePin, onMarkAsRead, curren
                   <button
                     key={task.id}
                     className={`w-full px-3 py-2 text-left rounded-lg transition-colors relative ${
-                      currentTaskId === task.id ? 'bg-gray-100 text-gray-900' : 'text-gray-700 hover:bg-gray-100'
+                      activeTabType === 'chat' && currentTaskId === task.id ? 'bg-gray-100 text-gray-900' : 'text-gray-700 hover:bg-gray-100'
                     }`}
                     onContextMenu={(e) => handleContextMenu(e, task.id)}
                     onClick={() => {
                       setCurrentTaskId(task.id);
-                      setSelectedMenu('');
                       openTab('chat', task.title, task.id);
                       if (task.hasUnread) {
                         onMarkAsRead(task.id);
@@ -189,7 +180,10 @@ export function Sidebar({ tasks, onDeleteTask, onTogglePin, onMarkAsRead, curren
           className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
             activeTabType === 'usage' ? 'bg-gray-100 text-gray-900' : 'text-gray-700 hover:bg-gray-100'
           }`}
-          onClick={() => openTab('usage', '用量统计')}
+          onClick={() => {
+            setCurrentTaskId(null);
+            openTab('usage', '用量统计');
+          }}
         >
           <BarChart3 className="w-4 h-4 flex-shrink-0" />
           <span className="text-sm">用量统计</span>
@@ -199,7 +193,10 @@ export function Sidebar({ tasks, onDeleteTask, onTogglePin, onMarkAsRead, curren
           className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all mt-1 ${
             activeTabType === 'about' ? 'bg-gray-100 text-gray-900' : 'text-gray-700 hover:bg-gray-100'
           }`}
-          onClick={() => openTab('about', '关于本机')}
+          onClick={() => {
+            setCurrentTaskId(null);
+            openTab('about', '关于本机');
+          }}
         >
           <Info className="w-4 h-4 flex-shrink-0" />
           <span className="text-sm">关于本机</span>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { Sidebar } from './components/Sidebar';
 import { MainContent } from './components/MainContent';
@@ -67,16 +67,6 @@ export default function App() {
     ));
   };
 
-  const [selectedMenu, setSelectedMenu] = useState<string>('new-work');
-
-  // Sync sidebar highlight with active tab state
-  useEffect(() => {
-    const tabType = currentTaskId ? 'chat' : (selectedMenu === 'new-work' || selectedMenu === '' ? 'home' : selectedMenu);
-    window.dispatchEvent(new CustomEvent('workbuddy:tab-changed', {
-      detail: { tabType }
-    }));
-  }, [selectedMenu, currentTaskId]);
-
   return (
     <div className="h-screen bg-white overflow-hidden">
       <PanelGroup direction="horizontal">
@@ -88,8 +78,6 @@ export default function App() {
             onMarkAsRead={handleMarkAsRead}
             currentTaskId={currentTaskId}
             setCurrentTaskId={setCurrentTaskId}
-            selectedMenu={selectedMenu}
-            setSelectedMenu={setSelectedMenu}
           />
         </Panel>
 
@@ -98,8 +86,6 @@ export default function App() {
         <Panel defaultSize={85} minSize={50}>
           <MainContent
             onAddTask={handleAddTask}
-            currentTaskId={currentTaskId}
-            selectedMenu={selectedMenu}
             tasks={tasks}
             onUpdateTaskTitle={handleUpdateTaskTitle}
             onUpdateTaskStatus={handleUpdateTaskStatus}

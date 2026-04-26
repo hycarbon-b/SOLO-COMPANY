@@ -1,8 +1,8 @@
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { FileText, Image, Table, MoreVertical, Trash2, Eye, RefreshCw } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
 import { useState, useEffect, useRef } from 'react';
 import type { DiscussionThread } from '../../types/discussion';
+import type { ElectronAPI, ResourceFile } from '../../types/electron';
 import { WorkerStatusPanel } from './WorkerStatusPanel';
 
 interface FileItem {
@@ -16,33 +16,35 @@ interface FileItem {
 }
 
 interface RightPanelContainerProps {
-  onMessageSent?: number;
-  discussions?: DiscussionThread[];
-  onAgentTaskComplete?: () => void;
+  onAgentTaskComplete?: (thread: DiscussionThread) => void;
 }
 
-export function RightPanelContainer({ onMessageSent, discussions, onAgentTaskComplete }: RightPanelContainerProps) {
+export function RightPanelContainer({ onAgentTaskComplete }: RightPanelContainerProps) {
   const [files, setFiles] = useState<FileItem[]>([
     { id: '1', name: '股票分析报告.pdf', type: 'document', size: '2.3 MB', date: '2小时前', content: '# 股票分析报告\n\n## 市场概况\n\n本报告分析了当前市场的整体情况...' },
     { id: '2', name: '市场趋势图.png', type: 'image', size: '456 KB', date: '3小时前' },
     { id: '3', name: '交易数据.xlsx', type: 'spreadsheet', size: '1.2 MB', date: '1天前', content: '交易日期,股票代码,买入价,卖出价,盈亏\n2024-01-20,600519,1850.00,1920.00,+70.00' },
   ]);
-  const [filesLoading, setFilesLoading] = useState(false);
+  const electronAPI = (window as Window & { electronAPI?: ElectronAPI }).electronAPI;
+
+  const mapResourceFiles = (resourceFiles: ResourceFile[]): FileItem[] => (
+    resourceFiles.map((file) => ({
+      id: file.id,
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      date: file.date,
+      path: file.path,
+    }))
+  );
 
   // Load files from Electron API
   const loadResourceFiles = async () => {
     try {
-      if (window.electronAPI) {
-        const result = await window.electronAPI.getResourceFiles();
+      if (electronAPI) {
+        const result = await electronAPI.getResourceFiles();
         if (result.success && result.files.length > 0) {
-          setFiles(result.files.map((f: any) => ({
-            id: f.id,
-            name: f.name,
-            type: f.type as 'document' | 'image' | 'spreadsheet' | 'code',
-            size: f.size,
-            date: f.date,
-            path: f.path
-          })));
+          setFiles(mapResourceFiles(result.files));
         }
       }
     } catch (e) {
@@ -55,55 +57,27 @@ export function RightPanelContainer({ onMessageSent, discussions, onAgentTaskCom
     loadResourceFiles();
     
     // Start watching
-    window.electronAPI?.watchResourceFiles();
+    electronAPI?.watchResourceFiles();
     
     // Listen for file changes
-    const handleFileChange = (data: { files: any[] }) => {
-      setFiles(data.files.map((f: any) => ({
-        id: f.id,
-        name: f.name,
-        type: f.type as 'document' | 'image' | 'spreadsheet' | 'code',
-        size: f.size,
-        date: f.date,
-        path: f.path
-      })));
+    const handleFileChange = (data: { files: ResourceFile[] }) => {
+      setFiles(mapResourceFiles(data.files));
     };
     
-    window.electronAPI?.onResourceChanged(handleFileChange);
+    electronAPI?.onResourceChanged(handleFileChange);
     
     return () => {
-      window.electronAPI?.unwatchResourceFiles();
+      electronAPI?.unwatchResourceFiles();
     };
-  }, []);
+  }, [electronAPI]);
 
   const handleRefreshFiles = async () => {
-    setFilesLoading(true);
     await loadResourceFiles();
-    setFilesLoading(false);
   };
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
-  const [agentMessages, setAgentMessages] = useState<Array<{
-    id: string;
-    agent: string;
-    message: string;
-    time: string;
-    direction: 'left' | 'right';
-  }>>([]);
-  const agentMessagesEndRef = useRef<HTMLDivElement>(null);
-  const lastDiscussionsRef = useRef<DiscussionThread[]>([]);
-    const completedThreadIdsRef = useRef<Set<string>>(new Set());
-    const lastUpdateRef = useRef<number>(Date.now()); // 从用户进入时开始记录
-    const polledRef = useRef<boolean>(false); // 标记是否已轮询过
-
-  const agentAvatars: { [key: string]: { bg: string; initial: string } } = {
-    '数据分析师': { bg: 'bg-gradient-to-br from-blue-400 to-blue-600', initial: '数' },
-    '新闻分析师': { bg: 'bg-gradient-to-br from-purple-400 to-purple-600', initial: '新' },
-    '行情解读员': { bg: 'bg-gradient-to-br from-green-400 to-green-600', initial: '行' },
-    '策略顾问': { bg: 'bg-gradient-to-br from-orange-400 to-orange-600', initial: '策' },
-    '风险管理师': { bg: 'bg-gradient-to-br from-red-400 to-red-600', initial: '风' },
-    '市场研究员': { bg: 'bg-gradient-to-br from-indigo-400 to-indigo-600', initial: '市' },
-  };
+  const completedThreadIdsRef = useRef<Set<string>>(new Set());
+  const lastUpdateRef = useRef<number>(Date.now());
 
   const handleDeleteFile = (fileId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -117,21 +91,18 @@ export function RightPanelContainer({ onMessageSent, discussions, onAgentTaskCom
     setOpenMenuId(null);
   };
 
-  useEffect(() => {
-  }, [onMessageSent]);
-
   // 从 IPC 获取真实 discussion 数据
   useEffect(() => {
     const fetchDiscussions = async () => {
       try {
-        const result = await window.electronAPI.getDiscussions();
+        const result = await electronAPI?.getDiscussions();
         if (result.success && result.discussions) {
           const latestTime = lastUpdateRef.current;
           const allThreads = result.discussions; // 保存所有线程
           const now = Date.now();
           // 过滤出用户进入后新产生的线程
-          const newThreads = allThreads.filter(d => {
-            const threadTime = new Date(d.startTime).getTime();
+          const newThreads = allThreads.filter((thread) => {
+            const threadTime = new Date(thread.startTime).getTime();
             return threadTime > latestTime && threadTime <= now;
           });
           
@@ -151,42 +122,6 @@ export function RightPanelContainer({ onMessageSent, discussions, onAgentTaskCom
                 lastUpdateRef.current = threadTime;
               }
             }
-            lastDiscussionsRef.current = allThreads;
-            
-            const newMessages: Array<{
-              id: string;
-              agent: string;
-              message: string;
-              time: string;
-              direction: 'left' | 'right';
-            }> = [];
-            
-            for (const thread of newThreads) {
-              const { startRecord } = thread;
-              const agent = startRecord.worker_label || startRecord.worker_name;
-              
-              newMessages.push({
-                id: `${thread.id}-start`,
-                agent: agent,
-                message: `开始: ${startRecord.task_objective}`,
-                time: new Date(startRecord.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-                direction: 'left',
-              });
-              
-              if (thread.endRecord) {
-                const status = thread.endRecord.status === 'success' ? '✓' : 
-                              thread.endRecord.status === 'failed' ? '✗' : '~';
-                newMessages.push({
-                  id: `${thread.id}-end`,
-                  agent: agent,
-                  message: `${status} ${thread.endRecord.summary || ''}`,
-                  time: new Date(thread.endRecord.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-                  direction: 'right',
-                });
-              }
-            }
-            
-            setAgentMessages(prev => [...prev, ...newMessages].slice(-50));
           }
         }
       } catch (e) {
@@ -201,12 +136,7 @@ export function RightPanelContainer({ onMessageSent, discussions, onAgentTaskCom
     const interval = setInterval(fetchDiscussions, 5000);
     
     return () => clearInterval(interval);
-  }, []);
-
-  // 自动滚动到最新消息
-  useEffect(() => {
-    agentMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [agentMessages]);
+  }, [electronAPI, onAgentTaskComplete]);
 
   return (
     <>

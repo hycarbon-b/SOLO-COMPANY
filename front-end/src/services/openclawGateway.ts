@@ -243,10 +243,12 @@ function getWebSocket(): Promise<ExtWebSocket> {
  * 通过 OpenClaw Gateway 发送消息，支持流式回调。
  * @param message 用户消息内容
  * @param onStream 流式回调，每次有新内容时调用 (chunk, accumulated)
+ * @param systemPrompt 可选的系统提示词，用于设定 AI 角色和场景
  */
 export async function callOpenClawGateway(
   message: string,
-  onStream?: ((chunk: string, accumulated: string, isNewSegment?: boolean) => void) | null
+  onStream?: ((chunk: string, accumulated: string, isNewSegment?: boolean) => void) | null,
+  systemPrompt?: string
 ): Promise<{ text: string }> {
   const socket = await getWebSocket()
   const id = `${Date.now()}-${++messageId}-${Math.random().toString(36).slice(2, 8)}`
@@ -271,15 +273,18 @@ export async function callOpenClawGateway(
       },
     })
 
+    const params: Record<string, string> = { message, sessionKey, idempotencyKey: id }
+    if (systemPrompt) params.systemPrompt = systemPrompt
+
     socket.send(
       JSON.stringify({
         type: 'req',
         id,
         method: 'chat.send',
-        params: { message, sessionKey, idempotencyKey: id },
+        params,
       })
     )
-    logWs('SEND', { type: 'req', id, method: 'chat.send', params: { message, sessionKey, idempotencyKey: id } })
+    logWs('SEND', { type: 'req', id, method: 'chat.send', params })
   })
 }
 

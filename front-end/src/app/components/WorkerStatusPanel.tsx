@@ -1,31 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import workersData from './workers/information.json';
 import type { DiscussionThread } from '../../types/discussion';
+import {
+  TICK_MS, FADE_MS, HOLD_COMPLETED, DISCUSSION_POLL_MS,
+  SEGMENT_LEN, IDLE_GROUP_SIZE,
+  MORCANDI_GRADIENTS, STATUS_CONFIG,
+  type WorkerStatus,
+} from '../config/workerConfig';
 
-// ─── Types ──────────────────────────────────────────────────────────────────────
-type WorkerStatus = 'idle' | 'working' | 'success' | 'failed' | 'partial';
-
-// ─── Morcandi (莫兰迪) desaturated palette ────────────────────────────────────
-const MORCANDI_GRADIENTS: Record<string, string> = {
-  blue:    'linear-gradient(135deg, #8FA8BB 0%, #6E90A8 100%)',
-  emerald: 'linear-gradient(135deg, #8FB4A2 0%, #6D9E8A 100%)',
-  violet:  'linear-gradient(135deg, #A99FC4 0%, #8D83B4 100%)',
-  orange:  'linear-gradient(135deg, #C4A882 0%, #A88B64 100%)',
-  red:     'linear-gradient(135deg, #C49DA0 0%, #AB8184 100%)',
-  indigo:  'linear-gradient(135deg, #909DC4 0%, #7481B0 100%)',
-};
-
-const STATUS_CONFIG: Record<WorkerStatus, { label: string; badge: string; dot: string; text: string }> = {
-  idle:    { label: '待机',    badge: 'bg-stone-100 text-stone-400 border-stone-200',               dot: 'bg-stone-300',                text: 'text-stone-400' },
-  working: { label: '工作中',  badge: 'bg-[#FBF5E8] text-[#A07830] border-[#DFC898] animate-pulse', dot: 'bg-[#D4A84B] animate-pulse',  text: 'text-[#9E7730]' },
-  success: { label: '已完成',  badge: 'bg-[#EBF4EF] text-[#3D8A5E] border-[#A8D4B8]',              dot: 'bg-[#6BBF8E]',                text: 'text-[#3D7A55]' },
-  failed:  { label: '失败',    badge: 'bg-[#F8EDEC] text-[#9E5050] border-[#DCAAAA]',              dot: 'bg-[#C47878]',                text: 'text-[#8F4848]' },
-  partial: { label: '部分完成', badge: 'bg-[#FAF2E8] text-[#9A6E30] border-[#D9B888]',              dot: 'bg-[#C49050]',                text: 'text-[#8E6528]' },
-};
-
-// ─── Text segmenter ───────────────────────────────────────────────────────────
-// Split text into character-count segments (works for CJK — no ellipsis, hard clip)
-const SEGMENT_LEN = 13;
+// ─── Text segmenter (for long task messages) ────────────────────────────────
 function getSegments(text: string): string[] {
   if (!text) return [''];
   const out: string[] = [];
@@ -33,6 +16,12 @@ function getSegments(text: string): string[] {
     out.push(text.slice(i, i + SEGMENT_LEN));
   }
   return out;
+}
+
+// ─── Idle group: consecutive phrases joined with newlines ────────────────────
+function getIdleGroupText(phrases: string[], startIdx: number): string {
+  const n = phrases.length;
+  return Array.from({ length: IDLE_GROUP_SIZE }, (_, offset) => phrases[(startIdx + offset) % n]).join('\n');
 }
 
 // ─── Per-worker tick state ────────────────────────────────────────────────────
@@ -44,11 +33,6 @@ interface TickState {
   visible: boolean;
 }
 
-// ─── Timing constants ─────────────────────────────────────────────────────────
-const TICK_MS        = 3200;   // how often text swaps
-const FADE_MS        = 380;    // fade-out duration before swap
-const HOLD_COMPLETED = 9000;   // how long completed state shows before returning to idle
-
 interface WorkerStatusPanelProps {
   discussions?: DiscussionThread[];
 }
@@ -59,8 +43,7 @@ export function WorkerStatusPanel({ discussions: externalDiscussions }: WorkerSt
   const [states, setStates] = useState<Record<string, TickState>>(() => {
     const init: Record<string, TickState> = {};
     workersData.forEach(w => {
-      const segs = getSegments(w.intro_phrases[0]);
-      init[w.skill_id] = { status: 'idle', phraseIndex: 0, segmentIndex: 0, displayText: segs[0], visible: true };
+      init[w.skill_id] = { status: 'idle', phraseIndex: 0, segmentIndex: 0, displayText: getIdleGroupText(w.intro_phrases, 0), visible: true };
     });
     return init;
   });
@@ -80,7 +63,7 @@ export function WorkerStatusPanel({ discussions: externalDiscussions }: WorkerSt
       } catch { /* silent */ }
     };
     poll();
-    const id = setInterval(poll, 5000);
+    const id = setInterval(poll, DISCUSSION_POLL_MS);
     return () => clearInterval(id);
   }, [externalDiscussions]);
 
@@ -117,19 +100,9 @@ export function WorkerStatusPanel({ discussions: externalDiscussions }: WorkerSt
       if (!s || s.status !== 'idle') { stopTicker(skillId); return; }
 
       fadeSwap(skillId, (cur) => {
-        const currentPhrase = worker.intro_phrases[cur.phraseIndex];
-        const segs = getSegments(currentPhrase);
-        const nextSeg = cur.segmentIndex + 1;
-
-        if (nextSeg < segs.length) {
-          // Next segment of same phrase
-          return { segmentIndex: nextSeg, displayText: segs[nextSeg] };
-        } else {
-          // Advance to next phrase, reset to segment 0
-          const nextPhrase = (cur.phraseIndex + 1) % worker.intro_phrases.length;
-          const newSegs = getSegments(worker.intro_phrases[nextPhrase]);
-          return { phraseIndex: nextPhrase, segmentIndex: 0, displayText: newSegs[0] };
-        }
+        // Slide window by 1 phrase each tick
+        const nextPhrase = (cur.phraseIndex + 1) % worker.intro_phrases.length;
+        return { phraseIndex: nextPhrase, segmentIndex: 0, displayText: getIdleGroupText(worker.intro_phrases, nextPhrase) };
       });
     }, TICK_MS);
   }, [stopTicker, fadeSwap]);
@@ -189,10 +162,9 @@ export function WorkerStatusPanel({ discussions: externalDiscussions }: WorkerSt
         holdRefs.current[skillId] = setTimeout(() => {
           stopTicker(skillId);
           const worker = workersData.find(w => w.skill_id === skillId);
-          const segs = getSegments(worker?.intro_phrases[0] ?? '');
           setStates(prev => ({
             ...prev,
-            [skillId]: { status: 'idle', phraseIndex: 0, segmentIndex: 0, displayText: segs[0], visible: true },
+            [skillId]: { status: 'idle', phraseIndex: 0, segmentIndex: 0, displayText: getIdleGroupText(worker?.intro_phrases ?? [''], 0), visible: true },
           }));
           startIdleTicker(skillId);
         }, HOLD_COMPLETED);
@@ -277,15 +249,14 @@ export function WorkerStatusPanel({ discussions: externalDiscussions }: WorkerSt
                 </div>
               </div>
 
-              {/* ── Row 2: cycling ticker message ── */}
-              <div className="mt-2 pl-12 h-[16px] overflow-hidden">
+              {/* ── Row 2: cycling ticker message (3-line area) ── */}
+              <div className="mt-1.5 pl-12 h-[48px] overflow-hidden">
                 <span
-                  className={`text-[11px] leading-4 block whitespace-nowrap ${cfg.text}`}
+                  className={`text-[11px] leading-4 block whitespace-pre-line line-clamp-3 ${cfg.text}`}
                   style={{
                     opacity: s?.visible ? 1 : 0,
-                    transform: s?.visible ? 'translateY(0)' : 'translateY(4px)',
+                    transform: s?.visible ? 'translateY(0)' : 'translateY(5px)',
                     transition: `opacity ${FADE_MS}ms ease-in-out, transform ${FADE_MS}ms ease-in-out`,
-                    textOverflow: 'clip',
                   }}
                 >
                   {s?.displayText}

@@ -66,7 +66,8 @@ python {baseDir}/scripts/run_pipeline.py --list-strategies
 | `--random N` | 从沪深300随机选 N 只（与 `--symbol` 互斥）| — |
 | `--start` | 开始日期 `YYYY-MM-DD` | `2020-01-01` |
 | `--end` | 结束日期 | 今天 |
-| `--strategy` | 策略名称（见下表）| `ma_cross` |
+| `--strategy` | 策略名称（见下表）或配合 `--strategy-file` 使用的自定义名 | `ma_cross` |
+| `--strategy-file` | **自定义策略 Python 文件路径**（优先于 `--strategy`，见下方「自定义策略」节）| — |
 | `--params` | 策略参数 JSON，如 `'{"fast_period":5}'` | 各策略默认值 |
 | `--capital` | 初始资金 | `100000` |
 | `--commission` | 单边手续费 | `0.001`（0.1%）|
@@ -209,6 +210,96 @@ python {baseDir}/scripts/run_pipeline.py \
 
 ---
 
+## 自定义策略（Agent 创建模式）
+
+当用户描述**内置列表之外的策略逻辑**时（如「RSI+布林带组合」「量价背离」「机器学习信号」等），执行以下工作流：
+
+### 工作流程
+
+1. **理解逻辑**：分析用户描述（指标、买入条件、卖出条件、止盈/止损）
+2. **生成策略代码**：按下方模板生成 `.py` 文件内容
+3. **保存文件**：保存到 `{baseDir}/strategies/` 目录（如不存在则创建）
+4. **运行回测**：使用 `--strategy-file` 指定文件路径
+5. **汇报结果**：同标准流程
+
+### 策略文件模板
+
+```python
+# {baseDir}/strategies/<strategy_name>.py
+"""
+策略名称：XXX 策略
+策略逻辑：（在此简要描述买入/卖出逻辑）
+"""
+import pandas as pd
+import numpy as np
+
+# 策略标识符（用于报告标题，默认使用文件名）
+STRATEGY_NAME = "<strategy_name>"
+
+# 报告中展示的策略描述
+DESCRIPTION = "XXX 策略（参数说明）"
+
+# 默认参数字典
+PARAMS = {
+    "param1": <默认值>,
+    "param2": <默认值>,
+}
+
+
+def run(df: pd.DataFrame, param1=<默认值>, param2=<默认值>, **kwargs) -> pd.DataFrame:
+    """
+    接收 OHLCV DataFrame，返回带信号列的 DataFrame。
+
+    必须添加的列：
+      signal_enter = 1  → 买入信号（当日收盘后，次日开盘执行）
+      signal_exit  = 1  → 卖出信号
+
+    可选：添加 ind_* 前缀列（如 ind_rsi）供报告图表展示
+    """
+    df = df.copy()
+
+    # ── 在此实现策略逻辑 ──────────────────────────────────────────────
+
+    # 示例：计算指标
+    df["ind_example"] = df["close"].rolling(param1).mean()
+
+    # 生成信号（int 类型，0 或 1）
+    df["signal_enter"] = (<买入条件>).astype(int)
+    df["signal_exit"]  = (<卖出条件>).astype(int)
+
+    return df
+```
+
+### 调用命令
+
+```bash
+# 使用自定义策略文件运行回测
+python {baseDir}/scripts/run_pipeline.py \
+  --symbol 600519.SH \
+  --strategy-file {baseDir}/strategies/<strategy_name>.py \
+  --output <输出目录>
+
+# 自定义策略 + 覆盖参数
+python {baseDir}/scripts/run_pipeline.py \
+  --symbol 600519.SH \
+  --strategy-file {baseDir}/strategies/<strategy_name>.py \
+  --params '{"param1": 20, "param2": 0.03}' \
+  --output <输出目录>
+```
+
+### 策略编写规范
+
+| 规范项 | 说明 |
+|--------|------|
+| **入口函数** | `run(df, **kwargs)` 或 `strategy_<name>(df, **kwargs)`，两者取其一 |
+| **输入** | `df` 包含 `open, high, low, close, volume` 列，float64 类型 |
+| **必须输出** | `signal_enter`（int 0/1）和 `signal_exit`（int 0/1）|
+| **可选输出** | `ind_*` 前缀列（如 `ind_rsi`、`ind_upper`）会显示在报告图表中 |
+| **副本** | 必须 `df = df.copy()` 避免修改原始数据 |
+| **禁止** | 使用未来数据（前视偏差）；用 `shift(-n)` 直接生成当日信号 |
+
+---
+
 ## 输出规范
 
 运行结束后，向用户输出：
@@ -246,5 +337,5 @@ python {baseDir}/scripts/run_pipeline.py \
 **Q: 策略信号数为 0**
 → 检查参数是否合理（如 `fast_period > slow_period` 会导致无信号）
 
-**Q: 想要自定义策略**
-→ 在 `scripts/strategies.py` 中按同样格式添加新函数，注册到 `STRATEGIES` 字典即可
+**Q: 想要内置列表之外的自定义策略**
+→ 按照「自定义策略（Agent 创建模式）」节的模板生成 Python 文件，然后用 `--strategy-file` 参数指定路径即可，无需修改 `strategies.py`
