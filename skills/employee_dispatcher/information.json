@@ -1,6 +1,60 @@
 [
   {
-    "skill_id": "employee_cto",
+    "worker_id": "market_researcher",
+    "worker_label": "市场研究员 · 选股分析",
+    "worker_name": "市场研究员",
+    "role": "市场研究",
+    "name_zh": "市场研究员",
+    "color": "amber",
+    "description": "结合技术面/基本面/情绪综合选股，并将选股 HTML 卡片回传到会话",
+    "avatar_file": "市场研究员 · 选股分析.png",
+    "skills": ["stock-selector", "claw-console"],
+    "intro_phrases": [
+      "均线多头排列与量价配合筛选",
+      "MACD 金叉与 RSI 强势区间确认",
+      "基本面超预期与政策赛道筛选",
+      "stock-selector 内置 HTML 卡片渲染",
+      "claw-console inject_html 直接回传卡片"
+    ]
+  },
+  {
+    "worker_id": "strategy_advisor",
+    "worker_label": "策略顾问 · 量化回测",
+    "worker_name": "策略顾问",
+    "role": "策略评估",
+    "name_zh": "策略顾问",
+    "color": "cyan",
+    "description": "运行向量化回测产出 HTML 报告，并通过 claw-console 在 webview 打开 + 注入摘要卡（含跳转按钮）",
+    "avatar_file": "策略顾问 · 量化回测.png",
+    "skills": ["stock-quant-report", "claw-console"],
+    "intro_phrases": [
+      "baostock/akshare/yfinance 多源行情拉取",
+      "向量化回测含手续费、滑点与止损",
+      "净值曲线/月度热力图/交易明细一键报告",
+      "claw-console open_tab 打开 webview",
+      "claw-console inject_html 推送摘要卡 + 跳转按钮"
+    ]
+  },
+  {
+    "worker_id": "strategy_engineer",
+    "worker_label": "策略代码工程师 · Freqtrade 策略",
+    "worker_name": "策略代码工程师",
+    "role": "策略开发",
+    "name_zh": "策略代码工程师",
+    "color": "orange",
+    "description": "生成针对中国市场的 Freqtrade v2+ 量化策略代码框架",
+    "avatar_file": "策略代码工程师 · Freqtrade 策略.png",
+    "skills": ["freqtrade-cn-strategy"],
+    "intro_phrases": [
+      "CTA 趋势策略：均线、突破、动量、海龟",
+      "机器学习策略：XGBoost / LSTM 特征预测",
+      "多因子策略：动量 + 质量 + 趋势组合",
+      "初始化项目结构与 baostock 数据下载",
+      "回测参数优化与策略代码框架生成"
+    ]
+  },
+  {
+    "worker_id": "employee_cto",
     "worker_label": "CTO · 首席技术官",
     "worker_name": "David Zhang",
     "role": "CTO",
@@ -8,6 +62,7 @@
     "color": "blue",
     "description": "软件架构、技术选型与可行性评估专家",
     "avatar_file": "CTO · 首席技术官.png",
+    "skills": ["employee-cto"],
     "intro_phrases": [
       "专注于系统架构设计与技术战略",
       "评估技术可行性与开发周期",
@@ -17,7 +72,7 @@
     ]
   },
   {
-    "skill_id": "employee_cfo",
+    "worker_id": "employee_cfo",
     "worker_label": "CFO · 首席财务官",
     "worker_name": "Kevin Li",
     "role": "CFO",
@@ -25,6 +80,7 @@
     "color": "emerald",
     "description": "财务规划、ROI 分析与投资评估专家",
     "avatar_file": "CFO · 首席财务官.png",
+    "skills": ["employee-cfo"],
     "intro_phrases": [
       "精通财务规划与预算管理",
       "ROI、NPV 与 IRR 定量分析",
@@ -34,7 +90,7 @@
     ]
   },
   {
-    "skill_id": "employee_cpo",
+    "worker_id": "employee_cpo",
     "worker_label": "CPO · 首席产品官",
     "worker_name": "Lisa Wang",
     "role": "CPO",
@@ -42,80 +98,13 @@
     "color": "violet",
     "description": "产品路线图规划、用户需求分析与功能优先级专家",
     "avatar_file": "CPO · 首席产品官.png",
+    "skills": ["employee-cpo"],
     "intro_phrases": [
       "定义产品路线图与功能优先级",
       "运用 RICE、JTBD 框架分析用户需求",
       "制定产品需求文档与 UX 策略",
       "评估产品市场契合度",
       "竞品分析与差异化策略"
-    ]
-  },
-  {
-    "skill_id": "stock_selector",
-    "worker_label": "选股分析师 · 量化选股",
-    "worker_name": "选股分析师",
-    "role": "股票筛选",
-    "name_zh": "选股分析师",
-    "color": "amber",
-    "description": "结合技术面、基本面与市场情绪进行 A 股综合选股",
-    "avatar_file": "选股分析师 · 量化选股.png",
-    "intro_phrases": [
-      "均线多头排列与量价配合筛选",
-      "MACD 金叉与 RSI 强势区间确认",
-      "基本面超预期与政策赛道筛选",
-      "主力资金净流入与机构持仓追踪",
-      "板块催化剂与个股事件驱动分析"
-    ]
-  },
-  {
-    "skill_id": "stock_card_output",
-    "worker_label": "卡片输出员 · 股票卡片生成",
-    "worker_name": "卡片输出员",
-    "role": "报告生成",
-    "name_zh": "卡片输出员",
-    "color": "rose",
-    "description": "将选股结果结构化输出为 TradingView 风格 HTML 卡片",
-    "avatar_file": "卡片输出员 · 股票卡片生成.png",
-    "intro_phrases": [
-      "结构化解析选股数据并校验 schema",
-      "生成 TradingView 风格 HTML 卡片",
-      "支持涨跌趋势色彩与标签分类展示",
-      "输出自包含单文件 HTML 报告",
-      "对接选股分析师的流水线式输出"
-    ]
-  },
-  {
-    "skill_id": "stock_quant_report",
-    "worker_label": "量化回测分析师 · 策略回测",
-    "worker_name": "量化回测分析师",
-    "role": "量化回测",
-    "name_zh": "量化回测分析师",
-    "color": "cyan",
-    "description": "自动完成数据拉取、策略信号计算、回测与 HTML 报告输出",
-    "avatar_file": "量化回测分析师 · 策略回测.png",
-    "intro_phrases": [
-      "baostock/akshare/yfinance 多源行情数据拉取",
-      "支持 --strategy-file 动态加载自定义策略",
-      "向量化回测引擎含手续费、滑点与止损",
-      "生成净值曲线、月度热力图与交易明细报告",
-      "多标的批量回测与策略对比分析"
-    ]
-  },
-  {
-    "skill_id": "freqtrade_strategy",
-    "worker_label": "策略代码工程师 · Freqtrade 策略",
-    "worker_name": "策略代码工程师",
-    "role": "策略开发",
-    "name_zh": "策略代码工程师",
-    "color": "orange",
-    "description": "生成针对中国市场的 Freqtrade v2+ 量化策略代码框架",
-    "avatar_file": "策略代码工程师 · Freqtrade 策略.png",
-    "intro_phrases": [
-      "CTA 趋势策略：均线、突破、动量、海龟",
-      "机器学习策略：XGBoost / LSTM 特征预测",
-      "多因子策略：动量 + 质量 + 趋势组合",
-      "初始化项目结构与 baostock 数据下载",
-      "回测参数优化与策略代码框架生成"
     ]
   }
 ]

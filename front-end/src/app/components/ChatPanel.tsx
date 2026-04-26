@@ -5,8 +5,7 @@ import { useState, useRef, useEffect } from 'react';
 import { libraryFiles, type Message, type LibraryFile } from '../fakeChatData';
 import { AttachmentPreviewList } from './AttachmentPreviewList';
 import { FileLibraryModal } from './FileLibraryModal';
-import { StrategyCard } from './StrategyCard';
-import { StockPickerTable } from './StockPickerTable';
+
 
 // ─── Styled Markdown renderer ───────────────────────────────────────────────
 function MdContent({ children }: { children: string }) {
@@ -84,7 +83,40 @@ interface ChatPanelProps {
   onUpdateTitle?: (newTitle: string) => void;
 }
 
-export function ChatPanel({ messages, isTyping, inputValue, setInputValue, onSendMessage, messagesEndRef, taskTitle, onUpdateTitle }: ChatPanelProps) {
+// ─── HTML 卡片（iframe 隔离样式）─────────────────────────────────────────
+const IFRAME_RESET = `<style>html,body{margin:0!important;padding:0!important;background:transparent!important;}</style>`;
+
+function HtmlCardFrame({ html }: { html: string }) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [height, setHeight] = useState(80);
+
+  const srcDoc = /<html[\s>]/i.test(html)
+    ? html.replace(/<\/head>/i, `${IFRAME_RESET}</head>`)
+    : `<!DOCTYPE html><html><head><meta charset="utf-8">${IFRAME_RESET}</head><body>${html}</body></html>`;
+
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+    const adjust = () => {
+      const doc = iframe.contentDocument;
+      const h = doc?.body?.scrollHeight || doc?.documentElement?.scrollHeight || 0;
+      if (h > 0) setHeight(h);
+    };
+    iframe.addEventListener('load', adjust);
+    const t = window.setTimeout(adjust, 300);
+    return () => { iframe.removeEventListener('load', adjust); window.clearTimeout(t); };
+  }, [srcDoc]);
+
+  return (
+    <iframe
+      ref={iframeRef}
+      srcDoc={srcDoc}
+      sandbox="allow-same-origin"
+      title="html-card"
+      style={{ width: '100%', height: `${height}px`, border: 'none', display: 'block' }}
+    />
+  );
+}export function ChatPanel({ messages, isTyping, inputValue, setInputValue, onSendMessage, messagesEndRef, taskTitle, onUpdateTitle }: ChatPanelProps) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState(taskTitle || '');
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
@@ -178,10 +210,7 @@ export function ChatPanel({ messages, isTyping, inputValue, setInputValue, onSen
       <div className="flex-1 overflow-y-auto px-6 pt-6 bg-white">
         <div className="max-w-4xl mx-auto pb-2">
           {messages.map((message) => {
-            // 跳过空内容的助手消息（流式初始化时的空消息）
-            if (message.role === 'assistant' && !message.content && !message.isStrategy && !message.isStockPicker) {
-              return null;
-            }
+            if (message.role === 'assistant' && !message.content && message.type !== 'html') return null;
             
             return (
               <div key={message.id} className={`mb-6 ${message.role === 'user' ? 'flex justify-end' : ''}`}>
@@ -191,52 +220,9 @@ export function ChatPanel({ messages, isTyping, inputValue, setInputValue, onSen
                       <span className="text-white text-xs">AI</span>
                     </div>
                     <div className="flex-1">
-                      {message.isStrategy ? (
-                        <div className="max-w-2xl">
-                          <div className="bg-white rounded-2xl px-4 py-3 shadow-sm mb-3">
-                            <MdContent>{message.content}</MdContent>
-                          </div>
-                          <StrategyCard
-                            title="双均线交易策略"
-                            description="基于5日和20日移动平均线的经典交易策略，当短期均线上穿长期均线时买入，下穿时卖出"
-                            code={`# 双均线交易策略
-import pandas as pd
-import numpy as np
-
-def dual_ma_strategy(data, short_window=5, long_window=20):
-    """
-    双均线交易策略
-    :param data: 包含'close'价格的DataFrame
-    :param short_window: 短期均线窗口
-    :param long_window: 长期均线窗口
-    :return: 带有交易信号的DataFrame
-    """
-    # 计算移动平均线
-    data['short_ma'] = data['close'].rolling(window=short_window).mean()
-    data['long_ma'] = data['close'].rolling(window=long_window).mean()
-
-    # 生成交易信号
-    data['signal'] = 0
-    data.loc[data['short_ma'] > data['long_ma'], 'signal'] = 1  // 买入信号
-    data.loc[data['short_ma'] < data['long_ma'], 'signal'] = -1  // 卖出信号
-
-    # 计算持仓变化
-    data['position'] = data['signal'].diff()
-
-    return data
-
-# 使用示例
-# df = dual_ma_strategy(stock_data)
-// buy_signals = df[df['position'] == 2]
-// sell_signals = df[df['position'] == -2]`}
-                          />
-                        </div>
-                      ) : message.isStockPicker ? (
+                      {message.type === 'html' ? (
                         <div className="max-w-4xl">
-                          <div className="bg-white rounded-2xl px-4 py-3 shadow-sm mb-3">
-                            <MdContent>{message.content}</MdContent>
-                          </div>
-                          <StockPickerTable />
+                          <HtmlCardFrame html={message.content} />
                         </div>
                       ) : (
                         <div className="bg-white rounded-2xl px-4 py-3 inline-block max-w-2xl shadow-sm">

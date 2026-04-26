@@ -23,7 +23,7 @@ function logWs(prefix: string, data: unknown) {
   const entry: WsLogEntry = { id: ++_wsLogSeq, dir: prefix as 'SEND' | 'RECV', ts: Date.now(), data }
   if (_wsLogBuffer.length >= WS_LOG_MAX) _wsLogBuffer.shift()
   _wsLogBuffer.push(entry)
-  _wsLogSubscribers.forEach(fn => { try { fn(entry) } catch {} })
+  _wsLogSubscribers.forEach(fn => fn(entry))
 }
 
 export function getWsLogBuffer(): WsLogEntry[] {
@@ -240,7 +240,7 @@ function getWebSocket(): Promise<ExtWebSocket> {
         }
         // 分发给原始消息监听器（调试用）
         if (typeof (window as any).__ocRawListener === 'function') {
-          try { (window as any).__ocRawListener(data) } catch {}
+          ;(window as any).__ocRawListener(data)
         }
         handleGatewayMessage(data)
         logWs('RECV', data)
@@ -282,7 +282,7 @@ export async function callOpenClawGateway(
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       rejectRequest(id, new Error('请求超时，请检查 OpenClaw Gateway 是否正常运行'))
-    }, 120000)
+    }, 600000)
 
     pendingRequests.set(id, {
       sessionKey,

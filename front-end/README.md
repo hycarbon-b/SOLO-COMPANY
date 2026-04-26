@@ -177,3 +177,145 @@ requests.post(
         ▼
   新 Tab 渲染 <webview src={url} />
 ```
+
+---
+
+## 通过 HTTP POST 向消息流注入 HTML 卡片
+
+Electron 主进程启动时会在本机监听另一个 HTTP 服务，默认端口 **17900**（可通过环境变量 `INJECT_HTML_HTTP_PORT` 覆盖）。
+
+任何本地程序（选股工具、数据分析脚本、策略报告等）可以向该端口发送 `POST` 请求，将生成的 HTML 卡片直接注入到应用内指定会话的消息流中。
+
+### 使用场景
+
+- 选股报告卡片（使用 `stock-card-output2` 生成）
+- 数据分析可视化（图表、表格）
+- 策略回测报告
+- 实时行情快照
+- 任何自定义 HTML 展示内容
+
+### 请求格式
+
+支持 JSON 和 Form 两种格式：
+
+#### 1. JSON（推荐）
+
+```bash
+curl -X POST http://127.0.0.1:17900 \
+     -H "Content-Type: application/json" \
+     -d '{
+       "html": "<div style=\"padding:20px; background:#f5f5f5; border-radius:8px;\">选股结果卡片</div>",
+       "conversation_id": "conv_12345"
+     }'
+```
+
+#### 2. Form 表单
+
+```bash
+curl -X POST http://127.0.0.1:17900 \
+     -H "Content-Type: application/x-www-form-urlencoded" \
+     -d "html=...&conversation_id=conv_12345"
+```
+
+### 请求参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `html` | string | ✓ | HTML 内容（会清理 script 标签以防XSS） |
+| `conversation_id` | string | ✓ | 目标会话 ID，消息会被插入该会话的消息流 |
+
+### 响应
+
+成功：
+
+```json
+{
+  "ok": true,
+  "conversation_id": "conv_12345"
+}
+```
+
+失败：
+
+```json
+{
+  "ok": false,
+  "error": "missing html or conversation_id"
+}
+```
+
+### Python 示例
+
+```python
+import requests
+
+# 生成选股 HTML 卡片
+from pathlib import Path
+html_content = Path('stock-card-output2/output/report.html').read_text()
+
+# 注入到指定会话
+requests.post(
+    'http://127.0.0.1:17900',
+    json={
+        'html': html_content,
+        'conversation_id': 'conv_abc123'
+    }
+)
+```
+
+### 与 stock-card-output2 配合使用
+
+```bash
+# 1. 生成选股报告 HTML
+cd skills/stock-card-output2
+python card_script.py -i stock_data.json -o output/report.html
+
+# 2. Python 脚本读取并注入
+import requests
+from pathlib import Path
+
+html = Path('output/report.html').read_text()
+requests.post(
+    'http://127.0.0.1:17900',
+    json={'html': html, 'conversation_id': 'conv_stock_pick_001'}
+)
+```
+
+### 安全性说明
+
+- 所有注入的 HTML 会自动清理 `<script>` 标签，防止任意代码执行
+- 只允许从 `127.0.0.1` 访问（本机），不支持跨网络请求
+- 后期可通过环境变量 `INJECT_HTML_HTTP_PORT` 修改端口
+
+### 工作流程
+
+```
+外部程序（Agent / 选股工具）
+  └─ 生成 HTML（选股卡片 / 分析报告）
+        │
+        ├─ POST http://127.0.0.1:17900
+        └─ { "html": "...", "conversation_id": "..." }
+             │
+             ▼
+  Electron 主进程 (main.cjs)
+  清理 HTML（移除 script 标签）
+             │
+             ├─ mainWindow.webContents.send('inject-html', { html, conversationId })
+             │
+             ▼
+  preload.cjs  (IPC bridge)
+  ipcRenderer.on('inject-html') → callback({ html, conversationId })
+             │
+             ▼
+  MainContent.tsx  监听事件
+  创建 Message { type: 'html', content, role: 'assistant', ... }
+  添加到 messagesMap[conversationId]
+             │
+             ▼
+  ChatPanel.tsx  渲染消息
+  message.type === 'html'
+  <div dangerouslySetInnerHTML={{ __html: content }} />
+             │
+             ▼
+  消息流中显示 HTML 卡片
+```

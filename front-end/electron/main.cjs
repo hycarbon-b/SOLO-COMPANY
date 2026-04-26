@@ -292,6 +292,81 @@ ipcMain.handle('discussion:list', async () => {
 // === 外部控制 HTTP 监听：POST 一个 url:port 字符串，打开一个网页 Tab ===
 const OPEN_URL_HTTP_PORT = Number(process.env.OPEN_URL_HTTP_PORT) || 17899
 
+// === 注入 HTML 卡片 HTTP 监听：POST { html, conversation_id } ===
+const INJECT_HTML_HTTP_PORT = Number(process.env.INJECT_HTML_HTTP_PORT) || 17900
+
+function sanitizeHtmlForInjection(html) {
+  // Strip script tags to prevent code execution
+  return String(html).replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script\s*>/gi, '')
+}
+
+function extractInjectPayload(body, contentType) {
+  const ct = (contentType || '').toLowerCase()
+  const trimmed = (body || '').trim()
+  if (!trimmed) return null
+  // JSON (default if starts with {)
+  if (ct.includes('application/json') || trimmed.startsWith('{')) {
+    try {
+      const obj = JSON.parse(trimmed)
+      if (obj && obj.html && obj.conversation_id) {
+        return { html: obj.html, conversationId: obj.conversation_id }
+      }
+    } catch {}
+  }
+  // form-urlencoded
+  if (ct.includes('application/x-www-form-urlencoded')) {
+    const params = new URLSearchParams(trimmed)
+    const html = params.get('html')
+    const conversationId = params.get('conversation_id')
+    if (html && conversationId) return { html, conversationId }
+  }
+  return null
+}
+
+function startInjectHtmlHttpServer() {
+  const server = http.createServer((req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+    if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return }
+    if (req.method !== 'POST') {
+      res.writeHead(405, { 'Content-Type': 'text/plain' })
+      res.end('Method Not Allowed')
+      return
+    }
+    const chunks = []
+    let bodyLen = 0
+    req.on('data', (c) => { bodyLen += c.length; if (bodyLen > 100 * 1024) { req.destroy(); return; } chunks.push(c) })
+    req.on('end', () => {
+      const body = Buffer.concat(chunks).toString('utf8')
+      const payload = extractInjectPayload(body, req.headers['content-type'])
+      if (!payload) {
+        res.writeHead(400, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ ok: false, error: 'missing html or conversation_id' }))
+        return
+      }
+      const safeHtml = sanitizeHtmlForInjection(payload.html)
+      debug('[inject-html] conversation_id =', payload.conversationId, 'html len =', safeHtml.length)
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('inject-html', { html: safeHtml, conversationId: payload.conversationId })
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ ok: true, conversation_id: payload.conversationId }))
+      } else {
+        res.writeHead(503, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ ok: false, error: 'main window not ready' }))
+      }
+    })
+    req.on('error', (e) => {
+      debug('[inject-html] request error:', e.message)
+      try { res.writeHead(500); res.end() } catch {}
+    })
+  })
+  server.on('error', (e) => { debug('[inject-html] server error:', e.message) })
+  server.listen(INJECT_HTML_HTTP_PORT, '127.0.0.1', () => {
+    debug(`[inject-html] HTTP listening on http://127.0.0.1:${INJECT_HTML_HTTP_PORT}  (POST JSON: { html, conversation_id })`)
+  })
+}
+
 function normalizeTargetUrl(raw) {
   if (!raw) return null
   let s = String(raw).trim().replace(/^["']|["']$/g, '')
@@ -340,9 +415,11 @@ function startOpenUrlHttpServer() {
       res.end('Method Not Allowed')
       return
     }
-    let body = ''
-    req.on('data', (c) => { body += c; if (body.length > 1e6) req.destroy() })
+    const chunks = []
+    let bodyLen = 0
+    req.on('data', (c) => { bodyLen += c.length; if (bodyLen > 1e6) { req.destroy(); return; } chunks.push(c) })
     req.on('end', () => {
+      const body = Buffer.concat(chunks).toString('utf8')
       const raw = extractUrlFromBody(body, req.headers['content-type'])
       const url = normalizeTargetUrl(raw)
       if (!url) {
@@ -386,6 +463,12 @@ app.whenReady().then(async () => {
     startOpenUrlHttpServer()
   } catch (e) {
     debug('startOpenUrlHttpServer error:', e.message)
+  }
+
+  try {
+    startInjectHtmlHttpServer()
+  } catch (e) {
+    debug('startInjectHtmlHttpServer error:', e.message)
   }
 
   // On OS X it's common to re-create a window in the app when the

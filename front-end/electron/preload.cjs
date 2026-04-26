@@ -34,4 +34,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('open-web-tab', handler)
     return () => ipcRenderer.removeListener('open-web-tab', handler)
   },
+
+  // 外部 HTTP 注入 HTML 卡片到指定会话
+  onInjectHtml: (callback) => {
+    const handler = (_event, data) => callback(data)
+    ipcRenderer.on('inject-html', handler)
+    return () => ipcRenderer.removeListener('inject-html', handler)
+  },
 });

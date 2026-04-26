@@ -10,6 +10,7 @@
 | `app/components/TradingPage.tsx` | `TradingPage` | 交易页面，模拟盘/实盘交易记录 |
 | `app/components/MarketPage.tsx` | `MarketPage` | 市场页面，行情图表显示 |
 | `app/components/SchedulePage.tsx` | `SchedulePage` | 定时任务页面，显示计划的自动化任务 |
+| `app/components/MonitorPage.tsx` | `MonitorPage` | 实盘监控工作流编辑器（概念页），拖拽节点配置消息源→聚合分析→推送渠道 |
 | `app/components/UsagePage.tsx` | `UsagePage` | 用量页面，Token消耗统计和趋势图 |
 
 ---

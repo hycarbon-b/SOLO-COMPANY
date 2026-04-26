@@ -21,10 +21,15 @@ import { UsagePage } from './UsagePage';
 import { AboutPage } from './AboutPage';
 import { SchedulePage } from './SchedulePage';
 import { MarketPage } from './MarketPage';
+import { MonitorPage } from './MonitorPage';
+
+// === Helpers ===
+const genMsgId = (role: 'user' | 'assistant') =>
+  `${Date.now()}-${role}-${Math.random().toString(36).slice(2, 9)}`;
 
 
 // === Tab Types ===
-export type TabType = 'home' | 'files' | 'trading' | 'market' | 'agent' | 'schedule' | 'usage' | 'about' | 'chat' | 'web';
+export type TabType = 'home' | 'files' | 'trading' | 'market' | 'agent' | 'schedule' | 'usage' | 'about' | 'chat' | 'web' | 'monitor';
 
 export interface Tab {
   id: string;           // unique tab id
@@ -81,8 +86,9 @@ export function MainContent({ onAddTask, tasks, onUpdateTaskTitle, onUpdateTaskS
   // === Persistence: load messages when a chat tab opens =====================
   useEffect(() => {
     if (!effectiveTaskId) return;
-    // Skip seed/fake tasks (numeric IDs) if already loaded
-    if (messagesMap[effectiveTaskId] !== undefined) return;
+    // Skip only if there are already messages in memory for this task
+    // Use length check (not !== undefined) to handle edge case of empty array
+    if ((messagesMap[effectiveTaskId]?.length ?? 0) > 0) return;
     const stored = loadMessages(effectiveTaskId);
     if (stored.length > 0) {
       setMessagesMap(prev => ({
@@ -100,14 +106,19 @@ export function MainContent({ onAddTask, tasks, onUpdateTaskTitle, onUpdateTaskS
 
   // === Persistence: save messages whenever they change =====================
   // Only persist non-seed (non-numeric-short) task IDs to avoid filling storage with fake data
+  // Track previous map to only save changed tasks (avoid re-saving everything on every stream tick)
+  const prevMessagesMapRef = useRef<Record<string, Message[]>>({});
   useEffect(() => {
+    const prev = prevMessagesMapRef.current;
     Object.entries(messagesMap).forEach(([taskId, msgs]) => {
       if (/^\d{1,2}$/.test(taskId)) return; // skip seed IDs ('1','2'...)
+      if (prev[taskId] === msgs) return;     // reference unchanged, skip re-save
       saveMessages(taskId, msgs.map(m => ({
         ...m,
         timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : String(m.timestamp),
       })));
     });
+    prevMessagesMapRef.current = messagesMap;
   }, [messagesMap]);
 
   // === Persistence: save system prompts whenever they change ================
@@ -128,6 +139,34 @@ export function MainContent({ onAddTask, tasks, onUpdateTaskTitle, onUpdateTaskS
     window.addEventListener('yuanji:reset-all', handler);
     return () => window.removeEventListener('yuanji:reset-all', handler);
   }, []);
+
+  // === Inject HTML card from external HTTP request (port 17900) =============
+  useEffect(() => {
+    const api = (window as any).electronAPI;
+    if (!api?.onInjectHtml) return;
+    const off = api.onInjectHtml((data: { html: string; conversationId: string }) => {
+      if (!data?.html || !data?.conversationId) return;
+      const { html, conversationId } = data;
+      const newMsg: Message = {
+        id: genMsgId('assistant'),
+        role: 'assistant',
+        content: html,
+        type: 'html',
+        timestamp: new Date(),
+      };
+      setMessagesMap(prev => ({
+        ...prev,
+        [conversationId]: [...(prev[conversationId] || []), newMsg],
+      }));
+      // Switch to the conversation tab if the task exists
+      const existingTask = tasks.find(t => t.id === conversationId);
+      if (existingTask) {
+        handleOpenTab('chat', existingTask.title, conversationId);
+      }
+    });
+    return () => { if (typeof off === 'function') off(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks, handleOpenTab]);
 
   const messages = effectiveTaskId ? (messagesMap[effectiveTaskId] || []) : [];
   useEffect(() => {
@@ -205,189 +244,86 @@ export function MainContent({ onAddTask, tasks, onUpdateTaskTitle, onUpdateTaskS
   const handleSendMessage = useCallback(async () => {
     if (!inputValue.trim()) return;
 
+    const userContent = inputValue.trim();
     const userMessage: Message = {
-      id: `${Date.now()}-user-${Math.random().toString(36).slice(2, 9)}`,
+      id: genMsgId('user'),
       role: 'user',
-      content: inputValue.trim(),
+      content: userContent,
       timestamp: new Date(),
     };
 
     let taskIdToUse = effectiveTaskId;
-
-    // If no active chat tab, create one
     if (effectiveTaskId === null) {
-      taskIdToUse = onAddTask(inputValue.trim().substring(0, 30));
-      // Open the new task as a chat tab
-      handleOpenTab('chat', inputValue.trim().substring(0, 30), taskIdToUse);
+      taskIdToUse = onAddTask(userContent.substring(0, 30));
+      handleOpenTab('chat', userContent.substring(0, 30), taskIdToUse);
     }
 
-    const userContent = inputValue.trim();
     setInputValue('');
     setAttachedFiles([]);
     setAttachedLibraryFiles([]);
 
-    if (taskIdToUse) {
+    if (!taskIdToUse) return;
+    const taskId = taskIdToUse;
+
+    setMessagesMap(prev => ({
+      ...prev,
+      [taskId]: [...(prev[taskId] || []), userMessage],
+    }));
+    onUpdateTaskStatus(taskId, 'working');
+
+    // Helper: patch one assistant message by id
+    const patchMsg = (msgId: string, patch: (m: Message) => Partial<Message>) => {
+      setMessagesMap(prev => {
+        const msgs = prev[taskId] || [];
+        const idx = msgs.findIndex(m => m.id === msgId);
+        if (idx === -1) return prev;
+        const updated = [...msgs];
+        updated[idx] = { ...updated[idx], ...patch(updated[idx]) };
+        return { ...prev, [taskId]: updated };
+      });
+    };
+    const appendMsg = (msg: Message) => {
       setMessagesMap(prev => ({
         ...prev,
-        [taskIdToUse!]: [...(prev[taskIdToUse!] || []), userMessage],
+        [taskId]: [...(prev[taskId] || []), msg],
       }));
-      onUpdateTaskStatus(taskIdToUse, 'working');
-    }
+    };
 
-          <RightPanelContainer onAgentTaskComplete={handleAgentTaskComplete} />
-
-    // 创建一个唯一的助手消息ID用于流式更新
-    const assistantMsgId = `${Date.now()}-assistant-${Math.random().toString(36).slice(2, 9)}`;
-    // 当前正在流式更新的气泡 ID（会随新分段事件变化）
+    // Initial assistant placeholder
+    const assistantMsgId = genMsgId('assistant');
     let currentAsstMsgId = assistantMsgId;
-    if (taskIdToUse) {
-      setMessagesMap(prev => {
-        const currentMessages = prev[taskIdToUse!] || [];
-        return {
-          ...prev,
-          [taskIdToUse!]: [
-            ...currentMessages,
-            { id: assistantMsgId, role: 'assistant', content: '', timestamp: new Date() },
-          ],
-        };
-      });
-    }
+    appendMsg({ id: assistantMsgId, role: 'assistant', content: '', timestamp: new Date() });
 
     setIsTyping(true);
 
     try {
-      const activeSystemPrompt = taskIdToUse
-        ? (systemPromptsMap[taskIdToUse] ?? chatConfig.defaultSystemPrompt)
-        : chatConfig.defaultSystemPrompt;
-      // 替换对话ID placeholder
-      const finalSystemPrompt = taskIdToUse
-        ? activeSystemPrompt.replace('{{CONVERSATION_ID}}', taskIdToUse)
-        : activeSystemPrompt;
+      const sysPrompt = systemPromptsMap[taskId] ?? chatConfig.defaultSystemPrompt;
+      const finalSystemPrompt = sysPrompt.replace('{{CONVERSATION_ID}}', taskId);
       const { text } = await callOpenClawGateway(
         userContent,
         (_chunk, accumulated, isNewSegment) => {
-          if (!taskIdToUse) return;
-
-          // 首个数据块到达时关闭加载气泡
           setIsTyping(false);
-
-          // 当 Gateway 开始一个新的流式分段时，把当前气泡定格，
-          // 并为新的分段创建一个全新的助手气泡。
           if (isNewSegment) {
-            const newMsgId = `${Date.now()}-assistant-${Math.random().toString(36).slice(2, 9)}`;
+            // Gateway started a new stream segment: freeze current bubble, open a new one
+            const newMsgId = genMsgId('assistant');
             currentAsstMsgId = newMsgId;
-            setMessagesMap(prev => {
-              const msgs = prev[taskIdToUse!] || [];
-              return {
-                ...prev,
-                [taskIdToUse!]: [
-                  ...msgs,
-                  { id: newMsgId, role: 'assistant', content: accumulated, timestamp: new Date() },
-                ],
-              };
-            });
+            appendMsg({ id: newMsgId, role: 'assistant', content: accumulated, timestamp: new Date() });
             return;
           }
-
-          // 每次收到新内容，更新当前助手气泡
-          setMessagesMap(prev => {
-            const msgs = prev[taskIdToUse!] || [];
-            const messageIndex = msgs.findIndex(m => m.id === currentAsstMsgId);
-
-            // 如果找不到消息，说明可能被意外清除了，重新添加
-            if (messageIndex === -1) {
-              console.warn('[Chat] Assistant message not found, re-adding:', currentAsstMsgId);
-              return {
-                ...prev,
-                [taskIdToUse!]: [
-                  ...msgs,
-                  { id: currentAsstMsgId, role: 'assistant', content: accumulated, timestamp: new Date() },
-                ],
-              };
-            }
-
-            // 正常更新现有消息
-            const updatedMessages = [...msgs];
-            updatedMessages[messageIndex] = {
-              ...updatedMessages[messageIndex],
-              content: accumulated,
-            };
-            return {
-              ...prev,
-              [taskIdToUse!]: updatedMessages,
-            };
-          });
+          patchMsg(currentAsstMsgId, () => ({ content: accumulated }));
         },
         finalSystemPrompt
       );
 
-      // 流结束后用最终文本兜底（非流式时直接赋值）
-      if (taskIdToUse) {
-        setMessagesMap(prev => {
-          const msgs = prev[taskIdToUse!] || [];
-          const messageIndex = msgs.findIndex(m => m.id === currentAsstMsgId);
-
-          if (messageIndex !== -1) {
-            const updatedMessages = [...msgs];
-            const existing = updatedMessages[messageIndex];
-            // 只有当当前气泡还没有内容时才使用 text 兜底，避免覆盖已经流式写入的分段内容
-            updatedMessages[messageIndex] = {
-              ...existing,
-              content: existing.content || text || '',
-            };
-            return {
-              ...prev,
-              [taskIdToUse!]: updatedMessages,
-            };
-          }
-
-          // 如果消息不存在，添加新消息
-          return {
-            ...prev,
-            [taskIdToUse!]: [
-              ...msgs,
-              { id: currentAsstMsgId, role: 'assistant', content: text || '', timestamp: new Date() },
-            ],
-          };
-        });
-        onUpdateTaskStatus(taskIdToUse, 'completed');
-      }
+      // Final fallback: only fill in if current bubble is still empty (non-stream case)
+      patchMsg(currentAsstMsgId, m => (m.content ? {} : { content: text || '' }));
+      onUpdateTaskStatus(taskId, 'completed');
     } catch (err: any) {
       const errorText = `⚠️ ${err?.message || '连接 OpenClaw Gateway 失败，请检查配置。'}`;
-      if (taskIdToUse) {
-        setMessagesMap(prev => {
-          const msgs = prev[taskIdToUse!] || [];
-          const messageIndex = msgs.findIndex(m => m.id === currentAsstMsgId);
-
-          if (messageIndex !== -1) {
-            const updatedMessages = [...msgs];
-            const existing = updatedMessages[messageIndex];
-            // 保留已经流式生成的内容，仅在末尾追加中断提示；
-            // 如果气泡完全为空，则直接显示错误信息。
-            const preservedContent = existing.content
-              ? `${existing.content}\n\n${errorText}`
-              : errorText;
-            updatedMessages[messageIndex] = {
-              ...existing,
-              content: preservedContent,
-            };
-            return {
-              ...prev,
-              [taskIdToUse!]: updatedMessages,
-            };
-          }
-
-          // 如果消息不存在，添加错误消息
-          return {
-            ...prev,
-            [taskIdToUse!]: [
-              ...msgs,
-              { id: currentAsstMsgId, role: 'assistant', content: errorText, timestamp: new Date() },
-            ],
-          };
-        });
-        onUpdateTaskStatus(taskIdToUse, 'error');
-      }
+      patchMsg(currentAsstMsgId, m => ({
+        content: m.content ? `${m.content}\n\n${errorText}` : errorText,
+      }));
+      onUpdateTaskStatus(taskId, 'error');
     } finally {
       setIsTyping(false);
     }
@@ -433,6 +369,8 @@ export function MainContent({ onAddTask, tasks, onUpdateTaskTitle, onUpdateTaskS
         return <AgentPage onStartChat={handleAgentStartChat} />;
       case 'schedule':
         return <SchedulePage />;
+      case 'monitor':
+        return <MonitorPage />;
       case 'usage':
         return <UsagePage />;
       case 'about':

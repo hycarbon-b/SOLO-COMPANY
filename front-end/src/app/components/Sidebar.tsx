@@ -1,4 +1,4 @@
-import { Plus, LayoutDashboard, FolderOpen, Receipt, Bot, BarChart3, Info, Trash2, Pin, PinOff, Clock, LineChart } from 'lucide-react';
+import { Plus, LayoutDashboard, FolderOpen, Receipt, Bot, BarChart3, Info, Trash2, Pin, PinOff, Clock, LineChart, Radio } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Task } from '../App';
 import logo from '../../imports/Union.png';
@@ -58,6 +58,7 @@ export function Sidebar({ tasks, onDeleteTask, onTogglePin, onMarkAsRead, curren
     { id: 'market', label: '行情', icon: LineChart, tabType: 'market' as const },
     { id: 'files', label: '文件库', icon: FolderOpen, tabType: 'files' as const },
     { id: 'schedule', label: '定时任务', icon: Clock, tabType: 'schedule' as const },
+    { id: 'monitor', label: '监控工作流', icon: Radio, tabType: 'monitor' as const },
     { id: 'trading', label: '交易管理', icon: Receipt, tabType: 'trading' as const },
     { id: 'agent', label: 'Agent', icon: Bot, tabType: 'agent' as const },
   ];

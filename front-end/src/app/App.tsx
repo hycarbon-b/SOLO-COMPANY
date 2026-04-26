@@ -3,13 +3,14 @@ import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { Sidebar } from './components/Sidebar';
 import { MainContent } from './components/MainContent';
 import type { Tab, TabType } from './components/MainContent';
+import { SplashScreen } from './components/SplashScreen';
 import {
   newConversationId, loadTasks, saveTasks, clearAll,
   type StoredTask,
 } from '../services/conversationStore';
 import {
   Home, FileText, TrendingUp, Table, Cpu, Activity,
-  HardDrive, Target, Globe, Plus, X
+  HardDrive, Target, Globe, Plus, X, Radio
 } from 'lucide-react';
 
 // === Tab Icons ===
@@ -24,6 +25,7 @@ const TAB_ICONS: Record<TabType, React.ReactNode> = {
   about: <FileText className="w-3.5 h-3.5 flex-shrink-0" />,
   chat: <Target className="w-3.5 h-3.5 flex-shrink-0" />,
   web: <Globe className="w-3.5 h-3.5 flex-shrink-0" />,
+  monitor: <Radio className="w-3.5 h-3.5 flex-shrink-0" />,
 };
 
 // === Full-width Edge/Figma-style TabBar ===
@@ -134,6 +136,17 @@ const SEED_TASKS: Task[] = [
 ];
 
 export default function App() {
+  // Splash screen state — every cold start shows the splash
+  const [splashDone, setSplashDone] = useState(false);
+  const [appVisible, setAppVisible] = useState(false);
+
+  useEffect(() => {
+    if (!splashDone) return;
+    // 主界面在 splash 淡出后再缓入，让两段动画错开
+    const t = setTimeout(() => setAppVisible(true), 80);
+    return () => clearTimeout(t);
+  }, [splashDone]);
+
   const [tasks, setTasks] = useState<Task[]>(() => {
     const stored = loadTasks();
     return stored.length > 0 ? stored : SEED_TASKS;
@@ -252,13 +265,13 @@ export default function App() {
   };
 
   const handleMarkAsRead = (taskId: string) => {
-    setTasks(tasks.map(task =>
+    setTasks(prev => prev.map(task =>
       task.id === taskId ? { ...task, hasUnread: false } : task
     ));
   };
 
   const handleUpdateTaskTitle = (taskId: string, newTitle: string) => {
-    setTasks(tasks.map(task =>
+    setTasks(prev => prev.map(task =>
       task.id === taskId ? { ...task, title: newTitle } : task
     ));
     // Also update the corresponding chat tab title
@@ -268,7 +281,7 @@ export default function App() {
   };
 
   const handleDeleteTask = (taskId: string) => {
-    setTasks(tasks.filter(task => task.id !== taskId));
+    setTasks(prev => prev.filter(task => task.id !== taskId));
     if (currentTaskId === taskId) setCurrentTaskId(null);
     // Close the corresponding chat tab if open
     const chatTabId = `chat-${taskId}`;
@@ -276,58 +289,68 @@ export default function App() {
   };
 
   const handleTogglePin = (taskId: string) => {
-    setTasks(tasks.map(task =>
+    setTasks(prev => prev.map(task =>
       task.id === taskId ? { ...task, pinned: !task.pinned } : task
     ));
   };
 
   const handleUpdateTaskStatus = (taskId: string, status: 'idle' | 'working' | 'completed' | 'error') => {
-    setTasks(tasks.map(task =>
+    setTasks(prev => prev.map(task =>
       task.id === taskId ? { ...task, status } : task
     ));
   };
 
   return (
-    <div className="h-screen flex flex-col bg-white overflow-hidden">
-      {/* Full-width Edge/Figma-style tab bar */}
-      <AppTabBar
-        tabs={tabs}
-        activeTabId={activeTabId}
-        onSelectTab={setActiveTabId}
-        onCloseTab={handleCloseTab}
-        onNewTab={() => handleOpenTab('home', '首页')}
-      />
+    <>
+      {!splashDone && <SplashScreen onEnter={() => setSplashDone(true)} />}
+      <div
+        className="h-screen flex flex-col bg-white overflow-hidden"
+        style={{
+          opacity: appVisible ? 1 : 0,
+          transform: appVisible ? 'translateY(0)' : 'translateY(6px)',
+          transition: 'opacity 800ms cubic-bezier(0.22, 1, 0.36, 1), transform 800ms cubic-bezier(0.22, 1, 0.36, 1)',
+        }}
+      >
+        {/* Full-width Edge/Figma-style tab bar */}
+        <AppTabBar
+          tabs={tabs}
+          activeTabId={activeTabId}
+          onSelectTab={setActiveTabId}
+          onCloseTab={handleCloseTab}
+          onNewTab={() => handleOpenTab('home', '首页')}
+        />
 
-      {/* Content area — border-top creates the "active tab merge" line */}
-      <div className="flex-1 overflow-hidden border-t border-neutral-200">
-        <PanelGroup direction="horizontal">
-          <Panel defaultSize={15} minSize={12} maxSize={25}>
-            <Sidebar
-              tasks={tasks}
-              onDeleteTask={handleDeleteTask}
-              onTogglePin={handleTogglePin}
-              onMarkAsRead={handleMarkAsRead}
-              currentTaskId={currentTaskId}
-              setCurrentTaskId={setCurrentTaskId}
-            />
-          </Panel>
+        {/* Content area — border-top creates the "active tab merge" line */}
+        <div className="flex-1 overflow-hidden border-t border-neutral-200">
+          <PanelGroup direction="horizontal">
+            <Panel defaultSize={15} minSize={12} maxSize={25}>
+              <Sidebar
+                tasks={tasks}
+                onDeleteTask={handleDeleteTask}
+                onTogglePin={handleTogglePin}
+                onMarkAsRead={handleMarkAsRead}
+                currentTaskId={currentTaskId}
+                setCurrentTaskId={setCurrentTaskId}
+              />
+            </Panel>
 
-          <PanelResizeHandle className="w-px bg-neutral-200 hover:bg-blue-400 transition-colors cursor-col-resize" />
+            <PanelResizeHandle className="w-px bg-neutral-200 hover:bg-blue-400 transition-colors cursor-col-resize" />
 
-          <Panel defaultSize={85} minSize={50}>
-            <MainContent
-              onAddTask={handleAddTask}
-              tasks={tasks}
-              onUpdateTaskTitle={handleUpdateTaskTitle}
-              onUpdateTaskStatus={handleUpdateTaskStatus}
-              tabs={tabs}
-              activeTabId={activeTabId}
-              onOpenTab={handleOpenTab}
-              onCloseTab={handleCloseTab}
-            />
-          </Panel>
-        </PanelGroup>
+            <Panel defaultSize={85} minSize={50}>
+              <MainContent
+                onAddTask={handleAddTask}
+                tasks={tasks}
+                onUpdateTaskTitle={handleUpdateTaskTitle}
+                onUpdateTaskStatus={handleUpdateTaskStatus}
+                tabs={tabs}
+                activeTabId={activeTabId}
+                onOpenTab={handleOpenTab}
+                onCloseTab={handleCloseTab}
+              />
+            </Panel>
+          </PanelGroup>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
