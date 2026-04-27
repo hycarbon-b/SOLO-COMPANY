@@ -25,6 +25,24 @@ interface FlowNode {
 
 interface Connection { from: string; to: string; }
 
+interface FeedMessage {
+  id: string;
+  channel: string;
+  channelIcon: React.ElementType;
+  time: string;
+  symbol: string;
+  text: string;
+  type: 'alert' | 'signal' | 'report';
+}
+
+const mockFeedMessages: FeedMessage[] = [
+  { id: 'm1', channel: '微信',     channelIcon: MessageCircle, time: '14:32', symbol: 'AAPL',   text: '苹果股价突破历史高点，成交量持续放大',    type: 'alert'  },
+  { id: 'm2', channel: 'Telegram', channelIcon: Send,          time: '14:01', symbol: 'NVDA',   text: 'AI芯片需求强劲，英伟达Q1营收大幅超预期', type: 'report' },
+  { id: 'm3', channel: '微信',     channelIcon: MessageCircle, time: '13:30', symbol: '双均线',  text: '策略触发买入信号，建议适当调整仓位',      type: 'signal' },
+  { id: 'm4', channel: 'Telegram', channelIcon: Send,          time: '13:00', symbol: '600519', text: '贵州茅台涨幅收窄，关注250日均线支撑位',   type: 'report' },
+  { id: 'm5', channel: '微信',     channelIcon: MessageCircle, time: '12:30', symbol: 'TSLA',   text: '特斯拉交付数据低于预期，短期承压',        type: 'alert'  },
+];
+
 // ── Canvas nodes ───────────────────────────────────────────────
 const defaultNodes: FlowNode[] = [
   { id: 's1', kind: 'source',   label: '持仓股票',      sublabel: '5 支',        icon: BookOpen,      color: 'text-blue-600',   bgColor: 'bg-blue-50',   borderColor: 'border-blue-200',   active: true  },
@@ -58,6 +76,15 @@ const initialPositions: Record<string, { x: number; y: number }> = {
 // Node card width/height for connection anchors
 const NW = 148;
 const NH = 64;
+
+// Feed panel constants
+const FEEDW = 200;
+const FEEDH_APPROX = 282;
+const FEED_POS = { x: 870, y: 50 };
+const feedConnections: Connection[] = [
+  { from: 'c1', to: 'feed' },
+  { from: 'c2', to: 'feed' },
+];
 
 function bezier(x1: number, y1: number, x2: number, y2: number) {
   const mx = (x1 + x2) / 2;
@@ -272,6 +299,58 @@ function PaletteItem({ icon: Icon, label, sublabel, color, bg }: {
       <div className="min-w-0">
         <div className="text-xs font-medium text-gray-700 truncate">{label}</div>
         <div className="text-[10px] text-gray-400 truncate">{sublabel}</div>
+      </div>
+    </div>
+  );
+}
+
+// ── Message Feed Panel (canvas overlay) ─────────────────────────
+function MessageFeedPanel() {
+  const typeStyles: Record<string, string> = {
+    alert:  'bg-red-50 text-red-500',
+    signal: 'bg-emerald-50 text-emerald-600',
+    report: 'bg-blue-50 text-blue-500',
+  };
+  const typeLabels: Record<string, string> = {
+    alert: '提醒', signal: '信号', report: '简报',
+  };
+  return (
+    <div
+      className="absolute rounded-xl border border-indigo-100 bg-white/95 shadow-lg overflow-hidden select-none"
+      style={{ left: FEED_POS.x, top: FEED_POS.y, width: FEEDW }}
+    >
+      {/* Header */}
+      <div className="flex items-center gap-1.5 px-3 py-2 bg-indigo-50/60 border-b border-indigo-100">
+        <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+        <span className="text-[9px] font-bold uppercase tracking-widest text-indigo-500">推送记录</span>
+        <span className="ml-auto text-[9px] text-gray-400 tabular-nums">今日 5 条</span>
+      </div>
+      {/* Message list */}
+      <div className="divide-y divide-gray-50">
+        {mockFeedMessages.map(msg => {
+          const ChannelIcon = msg.channelIcon;
+          return (
+            <div key={msg.id} className="px-2.5 py-2 hover:bg-gray-50/80 transition-colors">
+              <div className="flex items-center gap-1 mb-0.5">
+                <ChannelIcon className="w-2.5 h-2.5 text-green-500 flex-shrink-0" />
+                <span className="text-[9px] text-gray-400">{msg.channel}</span>
+                <span className={`ml-1 text-[8px] font-semibold px-1 rounded-sm ${typeStyles[msg.type]}`}>
+                  {typeLabels[msg.type]}
+                </span>
+                <span className="ml-auto text-[9px] text-gray-300 tabular-nums">{msg.time}</span>
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-[9px] font-bold text-gray-700 flex-shrink-0">{msg.symbol}</span>
+                <p className="text-[10px] text-gray-500 leading-snug truncate">{msg.text}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {/* Footer */}
+      <div className="flex items-center justify-center py-1.5 border-t border-gray-100 bg-gray-50/40 cursor-pointer hover:bg-gray-100/60 transition-colors">
+        <span className="text-[9px] text-gray-400">查看全部历史</span>
+        <ChevronRight className="w-2.5 h-2.5 text-gray-300 ml-0.5" />
       </div>
     </div>
   );
@@ -493,6 +572,27 @@ export function MonitorPage() {
                   />
                 );
               })}
+              {/* Feed connections */}
+              {feedConnections.map((conn, i) => {
+                const from = positions[conn.from];
+                if (!from) return null;
+                const x1 = from.x + NW;
+                const y1 = from.y + NH / 2;
+                const x2 = FEED_POS.x;
+                const y2 = FEED_POS.y + FEEDH_APPROX / 2;
+                return (
+                  <path
+                    key={`feed-${i}`}
+                    d={bezier(x1, y1, x2, y2)}
+                    fill="none"
+                    stroke="#818cf8"
+                    strokeWidth={1.5}
+                    strokeDasharray="4 3"
+                    markerEnd="url(#arrow-active)"
+                    opacity={0.45}
+                  />
+                );
+              })}
             </svg>
 
             {/* Node cards */}
@@ -508,9 +608,12 @@ export function MonitorPage() {
               />
             ))}
 
+            {/* Message feed panel */}
+            <MessageFeedPanel />
+
             {/* Column labels */}
             <div className="absolute top-4 left-0 pointer-events-none flex" style={{ paddingLeft: 68, gap: 248 }}>
-              {(['消息源', '聚合分析', '推送渠道'] as const).map(label => (
+              {(['消息源', '聚合分析', '推送渠道', '推送记录'] as const).map(label => (
                 <span key={label} className="text-[10px] uppercase tracking-widest text-gray-300 font-semibold">{label}</span>
               ))}
             </div>
@@ -603,7 +706,7 @@ export function MonitorPage() {
                   ))}
                   className={`relative w-9 h-5 rounded-full transition-colors ${selectedNode.active ? 'bg-indigo-500' : 'bg-gray-200'}`}
                 >
-                  <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${selectedNode.active ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${selectedNode.active ? 'translate-x-4' : 'translate-x-0'}`} />
                 </button>
               </div>
             </div>

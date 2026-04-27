@@ -35,6 +35,21 @@ declare global {
   interface Window {
     electronAPI: ElectronAPI
   }
+
+  // Electron <webview> tag JSX support
+  namespace JSX {
+    interface IntrinsicElements {
+      webview: React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
+        src?: string
+        allowpopups?: string
+        partition?: string
+        webpreferences?: string
+        nodeintegration?: string
+        preload?: string
+        disablewebsecurity?: string
+      }
+    }
+  }
 }
 
 export {}

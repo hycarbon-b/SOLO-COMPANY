@@ -533,6 +533,7 @@ export function MainContent({ onAddTask, tasks, onUpdateTaskTitle, onUpdateTaskS
               messagesEndRef={messagesEndRef}
               taskTitle={chatTask?.title}
               onUpdateTitle={(newTitle) => taskId && onUpdateTaskTitle(taskId, newTitle)}
+              onOpenTab={handleOpenTab}
             />
           </Panel>
           <PanelResizeHandle className="w-1 bg-gray-200 hover:bg-blue-400 transition-colors cursor-col-resize" />

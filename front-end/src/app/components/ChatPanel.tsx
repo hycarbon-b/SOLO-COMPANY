@@ -22,6 +22,32 @@ def dual_ma_strategy(data, short_window=5, long_window=20):
     return data
 `;
 
+// 演示用：智能选股 Pipeline 代码（isStockPickerCode 消息气泡使用）
+const STOCK_PICKER_PIPELINE_CODE = `# 多因子智能选股 Pipeline（示例）
+import pandas as pd
+
+def build_stock_pool(universe: pd.DataFrame) -> pd.DataFrame:
+    """步骤一：构建候选池，剔除 ST / 停牌 / 低流动性标的"""
+    pool = universe[(universe['is_st'] == 0) & (universe['is_suspended'] == 0)]
+    pool = pool[pool['turnover_20d'] >= 1e8]
+    return pool.copy()
+
+def score_stocks(pool: pd.DataFrame) -> pd.DataFrame:
+    """步骤二：多因子打分（基本面 35% + 估值 20% + 技术 25% + 情绪 20%）"""
+    pool['fundamental'] = 0.5 * pool['roe_rank'] + 0.5 * pool['profit_growth_rank']
+    pool['valuation']   = 0.6 * pool['pe_rank_inv'] + 0.4 * pool['peg_rank_inv']
+    pool['technical']   = 0.7 * pool['momentum_60d_rank'] + 0.3 * pool['volume_trend_rank']
+    pool['quality']     = (0.35 * pool['fundamental'] + 0.20 * pool['valuation']
+                          + 0.25 * pool['technical']  + 0.20 * pool['sentiment_rank'])
+    return pool
+
+def select_top_k(scored: pd.DataFrame, k: int = 6) -> pd.DataFrame:
+    """步骤三：风险过滤后按综合评分取 Top-K"""
+    filtered = scored[scored['volatility_20d'] <= 0.42]
+    result   = filtered.sort_values('quality', ascending=False).head(k)
+    return result[['symbol', 'name', 'quality', 'industry']]
+`;
+
 
 // ─── Styled Markdown renderer ───────────────────────────────────────────────
 function MdContent({ children }: { children: string }) {
@@ -97,6 +123,7 @@ interface ChatPanelProps {
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
   taskTitle?: string;
   onUpdateTitle?: (newTitle: string) => void;
+  onOpenTab?: (type: import('./MainContent').TabType, title: string, taskId?: string, url?: string) => void;
 }
 
 // ─── HTML 卡片（iframe 隔离样式）─────────────────────────────────────────
@@ -132,7 +159,37 @@ function HtmlCardFrame({ html }: { html: string }) {
       style={{ width: '100%', height: `${height}px`, border: 'none', display: 'block' }}
     />
   );
-}export function ChatPanel({ messages, isTyping, inputValue, setInputValue, onSendMessage, messagesEndRef, taskTitle, onUpdateTitle }: ChatPanelProps) {
+}
+
+// ─── 智能选股 Pipeline 代码气泡 ─────────────────────────────────────────────
+function StockPickerCodeBubble() {
+  const [showCode, setShowCode] = useState(false);
+  return (
+    <div className="bg-white rounded-2xl px-4 py-3 shadow-sm max-w-2xl">
+      <p className="text-[13px] text-gray-800 leading-6 mb-3">
+        我已将本次选股 Pipeline 整理为完整的 Python 代码，涵盖<strong className="font-semibold text-gray-900">候选池构建 → 多因子打分 → 风险过滤</strong>三个模块，可直接集成至 Freqtrade / Backtrader 等量化回测框架。
+      </p>
+      <button
+        onClick={() => setShowCode(!showCode)}
+        className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors text-sm"
+      >
+        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
+        </svg>
+        {showCode ? '隐藏代码' : '查看完整代码'}
+      </button>
+      {showCode && (
+        <div className="mt-3">
+          <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-xs">
+            <code>{STOCK_PICKER_PIPELINE_CODE}</code>
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function ChatPanel({ messages, isTyping, inputValue, setInputValue, onSendMessage, messagesEndRef, taskTitle, onUpdateTitle, onOpenTab }: ChatPanelProps) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState(taskTitle || '');
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
@@ -231,6 +288,7 @@ function HtmlCardFrame({ html }: { html: string }) {
               !message.content &&
               !message.isStrategy &&
               !message.isStockPicker &&
+              !message.isStockPickerCode &&
               message.type !== 'html'
             ) return null;
             
@@ -257,6 +315,7 @@ function HtmlCardFrame({ html }: { html: string }) {
                             title="双均线交易策略"
                             description="基于 5 日和 20 日移动平均线的经典交易策略，短期均线上穿长期均线时买入，下穿时卖出"
                             code={DUAL_MA_STRATEGY_CODE}
+                            onOpenTab={onOpenTab}
                           />
                         </div>
                       ) : message.isStockPicker ? (
@@ -268,6 +327,8 @@ function HtmlCardFrame({ html }: { html: string }) {
                           )}
                           <StockPickerTable />
                         </div>
+                      ) : message.isStockPickerCode ? (
+                        <StockPickerCodeBubble />
                       ) : (
                         <div className="bg-white rounded-2xl px-4 py-3 inline-block max-w-2xl shadow-sm">
                           <MdContent>{message.content}</MdContent>

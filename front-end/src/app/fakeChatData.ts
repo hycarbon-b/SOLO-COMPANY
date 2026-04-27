@@ -14,6 +14,7 @@ export interface Message {
   timestamp: Date;
   isStrategy?: boolean;
   isStockPicker?: boolean;
+  isStockPickerCode?: boolean;
 }
 
 export interface LibraryFile {
@@ -63,12 +64,21 @@ export const fakeMessagesMap: Record<string, Message[]> = {
   ],
   '4': [
     { id: '4-1', role: 'user', content: '帮我生成一个双均线交易策略', timestamp: new Date('2024-01-21T14:00:00') },
-    { id: '4-2', role: 'assistant', content: '好的，我为您生成了一个完整的双均线交易策略。这是一个基于5日均线和20日均线的经典策略，适合中短期交易。', timestamp: new Date('2024-01-21T14:00:30'), isStrategy: true },
+    { id: '4-n1', role: 'assistant', content: '收到，先整理设计思路。\n\n### 思考（一）：策略选型\n双均线属于**趋势跟踪**类，逻辑简单、可解释性强，适合量化基线策略：\n- **均线周期**：短周期越小信号越灵敏，5/20 日是 A 股常见组合，兼顾灵敏度与稳定性。\n- **市场适用性**：趋势市表现好，震荡市易产生假突破，建议叠加 ADX > 25 过滤器。\n- **与基准对比**：历史回测中该参数组合在趋势年份可跑赢沪深300约 8–15 pct。', timestamp: new Date('2024-01-21T14:00:04') },
+    { id: '4-n2', role: 'assistant', content: '### 工具调用：行情元数据查询\n\n```text\n> market_data.describe(symbol="000001.SH", freq="D", start="2015-01-01", end="2024-01-01")\n<- {\n     total_bars: 2196,  missing_rate: 0.003,\n     avg_daily_volume: 2.81e10,\n     trend_days_ratio: 0.58,  oscillation_days_ratio: 0.42\n   }\n```\n\n趋势行情占比约 **58%**，策略适用性合格；以上证指数作为趋势环境过滤器，震荡期降低下单频率。', timestamp: new Date('2024-01-21T14:00:08') },
+    { id: '4-n3', role: 'assistant', content: '### 思考（二）：参数确定 & 风控设计\n\n1. **参数**：短周期 5 日 + 长周期 20 日，两者差值适中，避免信号过密。\n2. **入场/出场**：金叉买入，死叉平仓；仓位上限 2 档，单笔 50%。\n3. **止损**：单笔亏损超过 −2% 强制止损，防止单次交易拖累整体曲线。\n4. **冷静期**：连续 3 次亏损后暂停 2 日交易，避免追损操作。', timestamp: new Date('2024-01-21T14:00:12') },
+    { id: '4-n4', role: 'assistant', content: '### 工具调用：参数网格扫描\n\n```text\n> strategy.param_scan(\n    short_range=[3, 5, 8], long_range=[15, 20, 30],\n    metric="sharpe", market="CN-A"\n  )\n<- best  : short=5, long=20  ->  sharpe=1.85  annual=+18.2%  max_dd=-8.3%\n   2nd   : short=8, long=30  ->  sharpe=1.62  annual=+14.7%  max_dd=-11.1%\n   3rd   : short=3, long=15  ->  sharpe=1.41  annual=+21.3%  max_dd=-15.6%\n```\n\n(5, 20) 在 3×3 网格中夏普最优，最大回撤也优于邻近参数，采用该配置。', timestamp: new Date('2024-01-21T14:00:16') },
+    { id: '4-2', role: 'assistant', content: '收到，我将基于经典的 SMA 双均线框架为您生成策略。\n\n### 思考过程（摘要）\n1. **参数选择**：短周期选 5 日（捕捉短期动能），长周期选 20 日（月均线，常作为趋势锚）。两者差值适中，避免过于频繁的虚假信号。\n2. **入场/出场规则**：短均上穿长均（金叉）买入，下穿（死叉）平仓；配合持仓不超过 2 档仓位约束。\n3. **风控设计**：加入单笔最大亏损 2% 的止损线，以及连续 3 次亏损后触发冷静期（暂停 2 日交易）。\n4. **适用标的**：主板蓝筹 / ETF，日线数据；震荡市效果减弱，建议叠加趋势过滤器。', timestamp: new Date('2024-01-21T14:00:18') },
+    { id: '4-3', role: 'assistant', content: '### 代码生成日志\n\n```text\n[14:00:19] init strategy scaffold (dual_ma)\n[14:00:19] set params: short_window=5, long_window=20, stop_loss=0.02\n[14:00:20] generate signal logic (golden-cross / death-cross)\n[14:00:20] add position sizing: max_position=0.95, order_pct=0.50\n[14:00:21] add risk guard: consecutive_loss_limit=3, cooldown_days=2\n[14:00:21] format freqtrade-compatible output\n[14:00:21] done -> strategy.py (74 lines)\n```\n\n策略文件已生成，以下是完整代码与回测入口：', timestamp: new Date('2024-01-21T14:00:22') },
+    { id: '4-4', role: 'assistant', content: '好的，我为您生成了一个完整的双均线交易策略。这是一个基于5日均线和20日均线的经典策略，适合中短期交易。', timestamp: new Date('2024-01-21T14:00:30'), isStrategy: true },
   ],
   '5': [
     { id: '5-1', role: 'user', content: '帮我智能选股，推荐一些优质标的', timestamp: new Date('2024-01-21T15:30:00') },
     { id: '5-2', role: 'assistant', content: '好的，我基于多因子量化模型为您筛选了当前市场中的优质标的。综合考虑了基本面、技术面、估值和市场情绪等多个维度。', timestamp: new Date('2024-01-21T15:30:20') },
     { id: '5-3', role: 'user', content: '能详细说明一下选股逻辑吗？', timestamp: new Date('2024-01-21T15:32:00') },
-    { id: '5-4', role: 'assistant', content: '当然。我的选股模型主要从以下几个维度进行评估：\n\n**1. 基本面分析**\n- ROE连续三年超过15%\n- 营收和净利润持续增长\n- 负债率处于合理水平\n\n**2. 估值分析**\n- PE、PB处于行业中位数以下或历史低位\n- PEG小于1，具有成长性溢价\n\n**3. 技术面分析**\n- 突破关键阻力位或处于上升通道\n- 成交量配合良好\n- MACD金叉等技术指标支持\n\n**4. 行业景气度**\n- 所属行业处于上升周期\n- 政策支持力度强\n- 市场需求旺盛\n\n以下是为您筛选出的6只优质标的：', timestamp: new Date('2024-01-21T15:32:45'), isStockPicker: true },
+    { id: '5-4', role: 'assistant', content: '当然可以。我先给您同步当前轮次的分析进度。\n\n### 思考过程（摘要）\n1. **构建候选池**：先从A股主板+创业板中筛选流动性达标标的，剔除ST与近30日停牌股票。\n2. **多因子打分**：从盈利质量、成长性、估值、趋势强度、资金行为五个维度计算标准化分数。\n3. **风险约束**：增加行业集中度和波动率上限，避免推荐结果过于偏科。\n4. **组合平衡**：在高分股票中二次筛选，保留不同行业和风格的代表性个股。', timestamp: new Date('2024-01-21T15:32:20') },
+    { id: '5-5', role: 'assistant', content: '### 执行调用日志（mock）\n\n```text\n[15:32:21] universe.load(market="CN-A", min_turnover=1e8)\n[15:32:22] factor.fetch(names=[ROE, yoy_revenue, PE_TTM, PEG, MOM_60D, VOL_20D])\n[15:32:23] quality.score(weights={fundamental:0.35, valuation:0.20, technical:0.25, sentiment:0.20})\n[15:32:24] risk.filter(max_industry_weight=0.35, max_volatility=0.42)\n[15:32:25] ranking.top_k(k=6, rebalance="weekly")\n[15:32:25] done -> 6 symbols selected\n```\n\n已完成计算，下面给出推荐结果与依据。', timestamp: new Date('2024-01-21T15:32:32') },
+    { id: '5-6', role: 'assistant', content: '我的选股模型主要从以下几个维度进行评估：\n\n**1. 基本面分析**\n- ROE连续三年超过15%\n- 营收和净利润持续增长\n- 负债率处于合理水平\n\n**2. 估值分析**\n- PE、PB处于行业中位数以下或历史低位\n- PEG小于1，具有成长性溢价\n\n**3. 技术面分析**\n- 突破关键阻力位或处于上升通道\n- 成交量配合良好\n- MACD金叉等技术指标支持\n\n**4. 行业景气度**\n- 所属行业处于上升周期\n- 政策支持力度强\n- 市场需求旺盛\n\n以下是为您筛选出的6只优质标的：', timestamp: new Date('2024-01-21T15:32:45'), isStockPicker: true },
+    { id: '5-7', role: 'assistant', content: '', timestamp: new Date('2024-01-21T15:33:10'), isStockPickerCode: true },
   ],
 };
