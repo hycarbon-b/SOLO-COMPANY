@@ -5,6 +5,22 @@ import { useState, useRef, useEffect } from 'react';
 import { libraryFiles, type Message, type LibraryFile } from '../fakeChatData';
 import { AttachmentPreviewList } from './AttachmentPreviewList';
 import { FileLibraryModal } from './FileLibraryModal';
+import { StrategyCard } from './StrategyCard';
+import { StockPickerTable } from './StockPickerTable';
+
+// 演示用：双均线策略示例代码（fakeChatData 中 isStrategy 消息使用）
+const DUAL_MA_STRATEGY_CODE = `# 双均线交易策略
+import pandas as pd
+
+def dual_ma_strategy(data, short_window=5, long_window=20):
+    data['short_ma'] = data['close'].rolling(window=short_window).mean()
+    data['long_ma']  = data['close'].rolling(window=long_window).mean()
+    data['signal']   = 0
+    data.loc[data['short_ma'] > data['long_ma'], 'signal'] =  1  # 买入
+    data.loc[data['short_ma'] < data['long_ma'], 'signal'] = -1  # 卖出
+    data['position'] = data['signal'].diff()
+    return data
+`;
 
 
 // ─── Styled Markdown renderer ───────────────────────────────────────────────
@@ -210,7 +226,13 @@ function HtmlCardFrame({ html }: { html: string }) {
       <div className="flex-1 overflow-y-auto px-6 pt-6 bg-white">
         <div className="max-w-4xl mx-auto pb-2">
           {messages.map((message) => {
-            if (message.role === 'assistant' && !message.content && message.type !== 'html') return null;
+            if (
+              message.role === 'assistant' &&
+              !message.content &&
+              !message.isStrategy &&
+              !message.isStockPicker &&
+              message.type !== 'html'
+            ) return null;
             
             return (
               <div key={message.id} className={`mb-6 ${message.role === 'user' ? 'flex justify-end' : ''}`}>
@@ -223,6 +245,28 @@ function HtmlCardFrame({ html }: { html: string }) {
                       {message.type === 'html' ? (
                         <div className="max-w-4xl">
                           <HtmlCardFrame html={message.content} />
+                        </div>
+                      ) : message.isStrategy ? (
+                        <div className="max-w-2xl">
+                          {message.content && (
+                            <div className="bg-white rounded-2xl px-4 py-3 shadow-sm mb-3">
+                              <MdContent>{message.content}</MdContent>
+                            </div>
+                          )}
+                          <StrategyCard
+                            title="双均线交易策略"
+                            description="基于 5 日和 20 日移动平均线的经典交易策略，短期均线上穿长期均线时买入，下穿时卖出"
+                            code={DUAL_MA_STRATEGY_CODE}
+                          />
+                        </div>
+                      ) : message.isStockPicker ? (
+                        <div className="max-w-4xl">
+                          {message.content && (
+                            <div className="bg-white rounded-2xl px-4 py-3 shadow-sm mb-3">
+                              <MdContent>{message.content}</MdContent>
+                            </div>
+                          )}
+                          <StockPickerTable />
                         </div>
                       ) : (
                         <div className="bg-white rounded-2xl px-4 py-3 inline-block max-w-2xl shadow-sm">

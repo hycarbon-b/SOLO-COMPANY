@@ -31,14 +31,23 @@ user-invocable: true
 | `127.0.0.1:8080` | `http://127.0.0.1:8080` |
 | `D:\reports\result.html` | `file:///D:/reports/result.html` |
 | `D:/reports/result.html` | `file:///D:/reports/result.html` |
+| `/home/chen/reports/x.html` | `file:////wsl.localhost/Ubuntu-22.04/home/chen/reports/x.html` |
+
+> **WSL 路径说明**：当 agent 在 WSL 中运行、HTML 文件也在 WSL 内时，传入 Linux 绝对路径即可。脚本自动从 `/etc/os-release` 读取发行版名（也可通过 `WSL_DISTRO_NAME` 环境变量或 `--wsl-distro` 参数手动指定），转换为 Windows 可访问的 `file:////wsl.localhost/` UNC 文件 URL。默认发行版为 `Ubuntu-22.04`。
 
 ### 模块调用
 
 ```python
 from scripts.open_tab import open_in_claw
 
-# 打开本地回测报告
+# 打开本地回测报告（Windows 路径）
 open_in_claw(r"D:\reports\backtest_result.html")
+
+# 打开 WSL 内的 HTML 报告（Linux 路径自动转换）
+open_in_claw("/home/chen/.openclaw/workspace/reports/report_600519.html")
+
+# 指定 WSL 发行版（非默认 Ubuntu-22.04 时使用）
+open_in_claw("/home/chen/report.html", wsl_distro="Debian")
 
 # 打开已启动的本地服务
 open_in_claw("127.0.0.1:8080/dashboard")
@@ -49,11 +58,17 @@ open_in_claw("https://example.com/report")
 
 ### CLI 调用
 
-```powershell
+```bash
+# 打开 WSL 内的 HTML 报告（发行版自动检测为 Ubuntu-22.04）
+python scripts/open_tab.py /home/chen/.openclaw/workspace/reports/report_600519.html
+
+# 指定 WSL 发行版
+python scripts/open_tab.py /home/chen/report.html --wsl-distro Ubuntu-22.04
+
 # 打开本地服务
 python scripts/open_tab.py 127.0.0.1:8080
 
-# 打开本地 HTML 文件（Windows 路径自动转换为 file:///）
+# 打开本地 HTML 文件（Windows 路径）
 python scripts/open_tab.py "D:\reports\result.html"
 
 # 打开远程页面

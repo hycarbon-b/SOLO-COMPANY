@@ -371,8 +371,9 @@ function normalizeTargetUrl(raw) {
   if (!raw) return null
   let s = String(raw).trim().replace(/^["']|["']$/g, '')
   if (!s) return null
-  // 已经包含协议
+  // 已经包含协议（http / https / file）
   if (/^https?:\/\//i.test(s)) return s
+  if (/^file:\/\//i.test(s)) return s
   // host:port 或 host:port/path
   if (/^[^/]+:\d+/.test(s)) return `http://${s}`
   // 仅 host
