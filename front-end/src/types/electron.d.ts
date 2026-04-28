@@ -22,33 +22,11 @@ export interface ElectronAPI {
   watchResourceFiles: () => Promise<{ success: boolean }>;
   unwatchResourceFiles: () => Promise<{ success: boolean }>;
   onResourceChanged: (callback: (data: { files: ResourceFile[] }) => void) => void;
-  removeResourceListener: () => void;
-  platform: string
-  versions: {
-    node: string
-    chrome: string
-    electron: string
-  }
 }
 
 declare global {
   interface Window {
     electronAPI: ElectronAPI
-  }
-
-  // Electron <webview> tag JSX support
-  namespace JSX {
-    interface IntrinsicElements {
-      webview: React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
-        src?: string
-        allowpopups?: string
-        partition?: string
-        webpreferences?: string
-        nodeintegration?: string
-        preload?: string
-        disablewebsecurity?: string
-      }
-    }
   }
 }
 

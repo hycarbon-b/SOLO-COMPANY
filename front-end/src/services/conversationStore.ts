@@ -17,7 +17,7 @@ export interface StoredTask {
   pinned?: boolean;
 }
 
-export interface StoredMessage {
+interface StoredMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;

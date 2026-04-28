@@ -11,22 +11,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getResourceFiles: () => ipcRenderer.invoke('resource:list'),
   watchResourceFiles: () => ipcRenderer.invoke('resource:watch'),
   unwatchResourceFiles: () => ipcRenderer.invoke('resource:unwatch'),
-  readResourceFile: (filePath) => ipcRenderer.invoke('resource:read', filePath),
   onResourceChanged: (callback) => {
     ipcRenderer.on('resource:changed', (event, data) => callback(data))
   },
-    removeResourceListener: () => {
-      ipcRenderer.removeAllListeners('resource:changed');
-    },
-  
-  platform: process.platform,
-  versions: {
-    node: process.versions.node,
-    chrome: process.versions.chrome,
-    electron: process.versions.electron,
-  },
-  // WS日志写入
-  wsLog: (prefix, data) => ipcRenderer.invoke('ws-log', { prefix, data }),
 
   // 外部 HTTP 请求打开网页 Tab
   onOpenWebTab: (callback) => {

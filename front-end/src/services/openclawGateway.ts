@@ -58,15 +58,6 @@ export function getToken(): string {
   return localStorage.getItem(STORAGE_KEY) || config.GATEWAY_KEY || ''
 }
 
-export function setToken(token: string) {
-  if (token) {
-    localStorage.setItem(STORAGE_KEY, token)
-  } else {
-    localStorage.removeItem(STORAGE_KEY)
-  }
-  config = loadGatewayConfig()
-}
-
 export function getGatewayConfig(): GatewayConfig {
   return config
 }
@@ -206,22 +197,20 @@ function getWebSocket(): Promise<ExtWebSocket> {
 
     rawWs.onopen = () => {
       connectRequestId = `connect-${Date.now()}`
-      rawWs.send(
-        JSON.stringify({
-          type: 'req',
-          id: connectRequestId,
-          method: 'connect',
-          params: {
-            minProtocol: 3,
-            maxProtocol: 10,
-            client: { id: 'openclaw-control-ui', version: '1.0.0', platform: 'web', mode: 'webchat' },
-            role: 'operator',
-            scopes: ['operator.read', 'operator.write', 'operator.admin'],
-            auth: { token },
-          },
-        })
-      )
-      const connectMsg = { type: 'req', id: connectRequestId, method: 'connect', params: { minProtocol: 3, maxProtocol: 10, client: { id: 'openclaw-control-ui', version: '1.0.0', platform: 'web', mode: 'webchat' }, role: 'operator', scopes: ['operator.read', 'operator.write', 'operator.admin'], auth: { token } } }
+      const connectMsg = {
+        type: 'req',
+        id: connectRequestId,
+        method: 'connect',
+        params: {
+          minProtocol: 3,
+          maxProtocol: 10,
+          client: { id: 'openclaw-control-ui', version: '1.0.0', platform: 'web', mode: 'webchat' },
+          role: 'operator',
+          scopes: ['operator.read', 'operator.write', 'operator.admin'],
+          auth: { token },
+        },
+      }
+      rawWs.send(JSON.stringify(connectMsg))
       logWs('SEND', connectMsg)
     }
 
@@ -238,19 +227,11 @@ function getWebSocket(): Promise<ExtWebSocket> {
           }
           return
         }
-        // 分发给原始消息监听器（调试用）
-        if (typeof (window as any).__ocRawListener === 'function') {
-          ;(window as any).__ocRawListener(data)
-        }
         handleGatewayMessage(data)
         logWs('RECV', data)
       } catch (err) {
         console.error('[Gateway] Parse error:', err)
       }
-    }
-
-    rawWs.onerror = () => {
-      // onclose will follow and clean up
     }
 
     rawWs.onclose = (event) => {

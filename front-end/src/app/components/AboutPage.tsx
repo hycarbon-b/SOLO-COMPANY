@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Laptop, Cpu, HardDrive, Shield, RefreshCw, Copy, Check, Trash2, AlertTriangle } from 'lucide-react';
+import { Laptop, Cpu, HardDrive, Shield, Copy, Check, Trash2, AlertTriangle } from 'lucide-react';
 import { GatewayStatusPanel } from './GatewayStatusPanel';
 import { WsDebugPanel } from './WsDebugPanel';
 import { clearAll } from '../../services/conversationStore';
@@ -9,8 +9,6 @@ export function AboutPage() {
 
   // 模拟系统信息数据
   const systemInfo = {
-    os: 'Windows 11 Pro',
-    version: '23H2 (OS Build 22631.2861)',
     deviceCode: 'YJ-T-2026-0421-A7B3C9',
     googleAuthCode: 'XKCD-MPLA-QWER-TYUI-ZXCV-BNM',
     hardware: {

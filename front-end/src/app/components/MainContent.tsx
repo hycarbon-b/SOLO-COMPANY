@@ -1,6 +1,6 @@
 import {
-  Mic, ArrowUp, Target, TrendingUp, Activity, Cpu, X, FileText,
-  Image as ImageIcon, HardDrive, Upload, Table, Home, Globe
+  Mic, ArrowUp, Target, TrendingUp, Activity, Cpu,
+  HardDrive, Upload
 } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import * as React from 'react';
@@ -10,6 +10,7 @@ import chatConfig from '../config/chatConfig.json';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { ChatPanel } from './ChatPanel';
 import { FileLibraryModal } from './FileLibraryModal';
+import { AttachmentPreviewList } from './AttachmentPreviewList';
 import { RightPanelContainer } from './RightPanelContainer';
 import { FilesPage } from './FilesPage';
 import { TradingPage } from './TradingPage';
@@ -54,14 +55,11 @@ interface MainContentProps {
 
 
 
-export function MainContent({ onAddTask, tasks, onUpdateTaskTitle, onUpdateTaskStatus, tabs, activeTabId, onOpenTab, onCloseTab }: MainContentProps) {
+export function MainContent({ onAddTask, tasks, onUpdateTaskTitle, onUpdateTaskStatus, tabs, activeTabId, onOpenTab: handleOpenTab, onCloseTab: handleCloseTab }: MainContentProps) {
   // === Tab State ===
   // Derive the effective taskId from the active tab
   const activeTab = tabs.find(t => t.id === activeTabId);
   const effectiveTaskId = activeTab?.type === 'chat' ? activeTab.taskId ?? null : null;
-
-  const handleOpenTab = onOpenTab;
-  const handleCloseTab = onCloseTab;
 
   // === Chat State ===
   const [inputValue, setInputValue] = useState('');
@@ -391,48 +389,12 @@ export function MainContent({ onAddTask, tasks, onUpdateTaskTitle, onUpdateTaskS
             <h1 className="text-4xl text-center mb-12 text-gray-900">我能为你做什么？</h1>
             <div className="relative mb-6">
               <div className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow border border-blue-100">
-                {(attachedFiles.length > 0 || attachedLibraryFiles.length > 0) && (
-                  <div className="px-4 pt-4 pb-2">
-                    <div className="flex flex-wrap gap-2">
-                      {attachedFiles.map((file, index) => {
-                        const FileIcon = file.type.startsWith('image/') ? ImageIcon : FileText;
-                        return (
-                          <div key={`local-${index}`} className="flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-2 group">
-                            <FileIcon className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                            <div className="flex flex-col min-w-0">
-                              <span className="text-sm text-gray-900 truncate max-w-[150px]">{file.name}</span>
-                              <span className="text-xs text-gray-500">
-                                {file.size < 1024
-                                  ? `${file.size} B`
-                                  : file.size < 1024 * 1024
-                                    ? `${(file.size / 1024).toFixed(1)} KB`
-                                    : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}
-                              </span>
-                            </div>
-                            <button onClick={() => handleRemoveFile(index)} className="p-1 hover:bg-blue-100 rounded transition-colors flex-shrink-0">
-                              <X className="w-3 h-3 text-gray-500" />
-                            </button>
-                          </div>
-                        );
-                      })}
-                      {attachedLibraryFiles.map((file) => {
-                        const FileIcon = file.icon;
-                        return (
-                          <div key={`library-${file.id}`} className="flex items-center gap-2 bg-green-50 rounded-lg px-3 py-2 group">
-                            <FileIcon className={`w-4 h-4 ${file.color} flex-shrink-0`} />
-                            <div className="flex flex-col min-w-0">
-                              <span className="text-sm text-gray-900 truncate max-w-[150px]">{file.name}</span>
-                              <span className="text-xs text-gray-500">{file.size}</span>
-                            </div>
-                            <button onClick={() => handleRemoveLibraryFile(file.id)} className="p-1 hover:bg-green-100 rounded transition-colors flex-shrink-0">
-                              <X className="w-3 h-3 text-gray-500" />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                <AttachmentPreviewList
+                  attachedFiles={attachedFiles}
+                  attachedLibraryFiles={attachedLibraryFiles}
+                  onRemoveFile={handleRemoveFile}
+                  onRemoveLibraryFile={handleRemoveLibraryFile}
+                />
                 <div className="p-4">
                   <input
                     type="text"

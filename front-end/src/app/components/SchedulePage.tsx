@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Clock3, CalendarClock, PlayCircle, PauseCircle, CheckCircle2, AlertTriangle, ChevronRight, TimerReset, BellRing, Workflow, Repeat2 } from 'lucide-react';
+import { Clock3, CalendarClock, PlayCircle, PauseCircle, CheckCircle2, ChevronRight, TimerReset, BellRing, Workflow, Repeat2, AlertTriangle } from 'lucide-react';
 
 type TaskStatus = 'running' | 'paused' | 'success' | 'warning';
 

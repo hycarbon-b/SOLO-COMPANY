@@ -1,4 +1,4 @@
-export interface DiscussionEntry {
+interface DiscussionEntry {
   schema: string
   event: 'start' | 'end'
   timestamp: string

@@ -27,9 +27,9 @@ interface StockInfo {
 
 // === Constants ===
 const MARKET_TABS = [
-  { key: 'a', label: 'A股', suffix: '' },
-  { key: 'us', label: '美股', suffix: '' },
-  { key: 'hk', label: '港股', suffix: '' },
+  { key: 'a', label: 'A股' },
+  { key: 'us', label: '美股' },
+  { key: 'hk', label: '港股' },
 ];
 
 const MOCK_STOCKS: Record<string, StockInfo[]> = {

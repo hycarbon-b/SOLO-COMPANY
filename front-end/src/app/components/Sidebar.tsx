@@ -1,6 +1,7 @@
 import { Plus, LayoutDashboard, FolderOpen, Receipt, Bot, BarChart3, Info, Trash2, Pin, PinOff, Clock, LineChart, Radio } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Task } from '../App';
+import type { TabType } from './MainContent';
 import logo from '../../imports/Union.png';
 
 interface SidebarProps {
@@ -10,27 +11,13 @@ interface SidebarProps {
   onMarkAsRead: (taskId: string) => void;
   currentTaskId: string | null;
   setCurrentTaskId: (taskId: string | null) => void;
+  activeTabType: string;
+  onOpenTab: (tabType: TabType, title: string, taskId?: string) => void;
 }
 
-export function Sidebar({ tasks, onDeleteTask, onTogglePin, onMarkAsRead, currentTaskId, setCurrentTaskId }: SidebarProps) {
-  const [activeTabType, setActiveTabType] = useState<string>('home');
-
-  // Listen to tab changes from MainContent to sync sidebar highlight
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent<{ tabType?: string }>).detail;
-      setActiveTabType(detail?.tabType ?? 'home');
-    };
-    window.addEventListener('workbuddy:tab-changed', handler);
-    return () => window.removeEventListener('workbuddy:tab-changed', handler);
-  }, []);
-  
-
-  // Dispatch open-tab event to MainContent
-  const openTab = (tabType: string, title: string, taskId?: string) => {
-    window.dispatchEvent(new CustomEvent('workbuddy:open-tab', {
-      detail: { tabType, title, taskId }
-    }));
+export function Sidebar({ tasks, onDeleteTask, onTogglePin, onMarkAsRead, currentTaskId, setCurrentTaskId, activeTabType, onOpenTab }: SidebarProps) {
+  const openTab = (tabType: TabType, title: string, taskId?: string) => {
+    onOpenTab(tabType, title, taskId);
   };
 
   const handleDeleteTask = (taskId: string) => {
@@ -54,7 +41,6 @@ export function Sidebar({ tasks, onDeleteTask, onTogglePin, onMarkAsRead, curren
   };
 
   const navItems = [
-    { id: 'dashboard', label: '控制台', icon: LayoutDashboard, tabType: 'dashboard' as const },
     { id: 'market', label: '行情', icon: LineChart, tabType: 'market' as const },
     { id: 'files', label: '文件库', icon: FolderOpen, tabType: 'files' as const },
     { id: 'schedule', label: '定时任务', icon: Clock, tabType: 'schedule' as const },
@@ -88,7 +74,7 @@ export function Sidebar({ tasks, onDeleteTask, onTogglePin, onMarkAsRead, curren
             <span className="text-sm">控制台</span>
           </button>
 
-          {navItems.filter(n => n.id !== 'dashboard').map(item => {
+          {navItems.map(item => {
             const Icon = item.icon;
             return (
               <button

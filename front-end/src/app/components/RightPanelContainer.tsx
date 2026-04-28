@@ -20,11 +20,7 @@ interface RightPanelContainerProps {
 }
 
 export function RightPanelContainer({ onAgentTaskComplete }: RightPanelContainerProps) {
-  const [files, setFiles] = useState<FileItem[]>([
-    { id: '1', name: '股票分析报告.pdf', type: 'document', size: '2.3 MB', date: '2小时前', content: '# 股票分析报告\n\n## 市场概况\n\n本报告分析了当前市场的整体情况...' },
-    { id: '2', name: '市场趋势图.png', type: 'image', size: '456 KB', date: '3小时前' },
-    { id: '3', name: '交易数据.xlsx', type: 'spreadsheet', size: '1.2 MB', date: '1天前', content: '交易日期,股票代码,买入价,卖出价,盈亏\n2024-01-20,600519,1850.00,1920.00,+70.00' },
-  ]);
+  const [files, setFiles] = useState<FileItem[]>([]);
   const electronAPI = (window as Window & { electronAPI?: ElectronAPI }).electronAPI;
 
   const mapResourceFiles = (resourceFiles: ResourceFile[]): FileItem[] => (
@@ -71,9 +67,7 @@ export function RightPanelContainer({ onAgentTaskComplete }: RightPanelContainer
     };
   }, [electronAPI]);
 
-  const handleRefreshFiles = async () => {
-    await loadResourceFiles();
-  };
+  const handleRefreshFiles = loadResourceFiles;
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
   const completedThreadIdsRef = useRef<Set<string>>(new Set());
@@ -99,11 +93,10 @@ export function RightPanelContainer({ onAgentTaskComplete }: RightPanelContainer
         if (result.success && result.discussions) {
           const latestTime = lastUpdateRef.current;
           const allThreads = result.discussions; // 保存所有线程
-          const now = Date.now();
           // 过滤出用户进入后新产生的线程
           const newThreads = allThreads.filter((thread) => {
             const threadTime = new Date(thread.startTime).getTime();
-            return threadTime > latestTime && threadTime <= now;
+            return threadTime > latestTime;
           });
           
           if (newThreads.length > 0) {

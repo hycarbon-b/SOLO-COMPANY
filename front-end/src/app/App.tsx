@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { Sidebar } from './components/Sidebar';
@@ -115,16 +116,7 @@ function AppTabBar({
   );
 }
 
-import * as React from 'react';
-
-export interface Task {
-  id: string;
-  title: string;
-  time: string;
-  pinned?: boolean;
-  status?: 'idle' | 'working' | 'completed' | 'error';
-  hasUnread?: boolean;
-}
+export type Task = StoredTask;
 
 const SEED_TASKS: Task[] = [
   { id: '1', title: '今日市场行情分析', time: '2小时前', status: 'completed', hasUnread: false },
@@ -155,7 +147,7 @@ export default function App() {
 
   // Persist tasks to localStorage whenever they change
   useEffect(() => {
-    saveTasks(tasks as StoredTask[]);
+    saveTasks(tasks);
   }, [tasks]);
 
   // === Tab State (lifted here so TabBar spans full width) ===
@@ -186,7 +178,6 @@ export default function App() {
       setTabs(prev => [...prev, newTab]);
       setActiveTabId(tabKey);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabs]);
 
   const handleCloseTab = useCallback((tabId: string) => {
@@ -202,23 +193,7 @@ export default function App() {
     });
   }, [activeTabId]);
 
-  // Listen to workbuddy:open-tab events (from Sidebar + Electron)
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent<{ tabType: TabType; title: string; taskId?: string; url?: string }>).detail;
-      handleOpenTab(detail.tabType, detail.title, detail.taskId, detail.url);
-    };
-    window.addEventListener('workbuddy:open-tab', handler);
-    return () => window.removeEventListener('workbuddy:open-tab', handler);
-  }, [handleOpenTab]);
-
-  // Sync active tab type to Sidebar
   const activeTab = tabs.find(t => t.id === activeTabId);
-  useEffect(() => {
-    window.dispatchEvent(new CustomEvent('workbuddy:tab-changed', {
-      detail: { tabType: activeTab?.type ?? 'home' }
-    }));
-  }, [activeTabId, activeTab?.type]);
 
   // Electron: open web tabs from main process
   useEffect(() => {
@@ -331,6 +306,8 @@ export default function App() {
                 onMarkAsRead={handleMarkAsRead}
                 currentTaskId={currentTaskId}
                 setCurrentTaskId={setCurrentTaskId}
+                activeTabType={activeTab?.type ?? 'home'}
+                onOpenTab={handleOpenTab}
               />
             </Panel>
 

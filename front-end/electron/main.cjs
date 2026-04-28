@@ -21,7 +21,7 @@ process.on('uncaughtException', (e) => {
 function checkDevServer() {
   return new Promise((resolve) => {
     debug('Checking Vite at http://localhost:5174...')
-    const req = http.get('http://localhost:5174', (res) => {
+    const req = http.get('http://localhost:5174', () => {
       debug('Vite is running!')
       resolve(true)
     })
@@ -77,16 +77,6 @@ async function createWindow() {
     mainWindow = null
   })
 }
-
-// WS 日志 WriteStream
-const wsLog = fs.createWriteStream('openclaw-gateway-ws.log', { flags: 'a', highWaterMark: 64 * 1024 })
-
-// IPC handler: WS 日志写入
-ipcMain.handle('ws-log', async (event, { prefix, data }) => {
-  const entry = `[${new Date().toISOString()}] [WS ${prefix}] ${JSON.stringify(data)}\n`
-  wsLog.write(entry)
-  wsLog.flush()
-})
 
 // Discussion file reading - read from d:\code\temp\discussion
 const discussionDir = 'd:\\code\\temp\\discussion'
@@ -158,7 +148,7 @@ ipcMain.handle('resource:watch', async () => {
     fileWatcher.close()
   }
   
-  const watchCallback = (eventType, filename) => {
+  const watchCallback = () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       getFileList().then(files => {
         mainWindow.webContents.send('resource:changed', { files })
@@ -182,16 +172,6 @@ ipcMain.handle('resource:unwatch', async () => {
     debug('Stopped watching resource folder')
   }
   return { success: true }
-})
-
-// IPC: read file content
-ipcMain.handle('resource:read', async (event, filePath) => {
-  try {
-    const content = await fs.promises.readFile(filePath, 'utf-8')
-    return { success: true, content }
-  } catch (e) {
-    return { success: false, error: e.message }
-  }
 })
 
 ipcMain.handle('discussion:list', async () => {
