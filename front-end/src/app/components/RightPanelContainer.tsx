@@ -2,7 +2,7 @@ import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { FileText, Image, Table, MoreVertical, Trash2, Eye, RefreshCw } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import type { DiscussionThread } from '../../types/discussion';
-import type { ElectronAPI, ResourceFile } from '../../types/electron';
+import type { ElectronAPI } from '../../types/electron';
 import { WorkerStatusPanel } from './WorkerStatusPanel';
 
 interface FileItem {
@@ -23,24 +23,13 @@ export function RightPanelContainer({ onAgentTaskComplete }: RightPanelContainer
   const [files, setFiles] = useState<FileItem[]>([]);
   const electronAPI = (window as Window & { electronAPI?: ElectronAPI }).electronAPI;
 
-  const mapResourceFiles = (resourceFiles: ResourceFile[]): FileItem[] => (
-    resourceFiles.map((file) => ({
-      id: file.id,
-      name: file.name,
-      type: file.type,
-      size: file.size,
-      date: file.date,
-      path: file.path,
-    }))
-  );
-
   // Load files from Electron API
   const loadResourceFiles = async () => {
     try {
       if (electronAPI) {
         const result = await electronAPI.getResourceFiles();
         if (result.success && result.files.length > 0) {
-          setFiles(mapResourceFiles(result.files));
+          setFiles(result.files);
         }
       }
     } catch (e) {
@@ -51,23 +40,13 @@ export function RightPanelContainer({ onAgentTaskComplete }: RightPanelContainer
   // Initialize file watching
   useEffect(() => {
     loadResourceFiles();
-    
-    // Start watching
     electronAPI?.watchResourceFiles();
-    
-    // Listen for file changes
-    const handleFileChange = (data: { files: ResourceFile[] }) => {
-      setFiles(mapResourceFiles(data.files));
-    };
-    
-    electronAPI?.onResourceChanged(handleFileChange);
-    
+    electronAPI?.onResourceChanged((data) => setFiles(data.files));
     return () => {
       electronAPI?.unwatchResourceFiles();
     };
   }, [electronAPI]);
 
-  const handleRefreshFiles = loadResourceFiles;
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
   const completedThreadIdsRef = useRef<Set<string>>(new Set());
@@ -90,44 +69,23 @@ export function RightPanelContainer({ onAgentTaskComplete }: RightPanelContainer
     const fetchDiscussions = async () => {
       try {
         const result = await electronAPI?.getDiscussions();
-        if (result.success && result.discussions) {
-          const latestTime = lastUpdateRef.current;
-          const allThreads = result.discussions; // 保存所有线程
-          // 过滤出用户进入后新产生的线程
-          const newThreads = allThreads.filter((thread) => {
-            const threadTime = new Date(thread.startTime).getTime();
-            return threadTime > latestTime;
-          });
-          
-          if (newThreads.length > 0) {
-            // 通知父组件有新的 Agent 任务完成
-            for (const thread of newThreads) {
-              if (thread.endRecord && !completedThreadIdsRef.current.has(thread.id)) {
-                completedThreadIdsRef.current.add(thread.id);
-                if (onAgentTaskComplete) onAgentTaskComplete(thread);
-              }
-            }
-
-            // 更新时间戳，但只针对新线程
-            for (const thread of newThreads) {
-              const threadTime = new Date(thread.startTime).getTime();
-              if (threadTime > lastUpdateRef.current) {
-                lastUpdateRef.current = threadTime;
-              }
-            }
+        if (!result?.success || !result.discussions) return;
+        for (const thread of result.discussions) {
+          const threadTime = new Date(thread.startTime).getTime();
+          if (threadTime <= lastUpdateRef.current) continue;
+          if (thread.endRecord && !completedThreadIdsRef.current.has(thread.id)) {
+            completedThreadIdsRef.current.add(thread.id);
+            onAgentTaskComplete?.(thread);
           }
+          lastUpdateRef.current = threadTime;
         }
       } catch (e) {
         console.error('Fetch discussions error:', e);
       }
     };
-    
-    // 初始获取
+
     fetchDiscussions();
-    
-    // 每5秒轮询
     const interval = setInterval(fetchDiscussions, 5000);
-    
     return () => clearInterval(interval);
   }, [electronAPI, onAgentTaskComplete]);
 
@@ -140,7 +98,7 @@ export function RightPanelContainer({ onAgentTaskComplete }: RightPanelContainer
               <div className="px-4 py-3 flex items-center justify-between">
                 <h3 className="text-sm font-medium text-gray-900">会话中的文件</h3>
                 <button
-                  onClick={handleRefreshFiles}
+                  onClick={loadResourceFiles}
                   className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
                   title="刷新"
                 >

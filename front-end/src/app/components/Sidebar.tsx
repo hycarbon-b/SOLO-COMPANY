@@ -1,4 +1,4 @@
-import { Plus, LayoutDashboard, FolderOpen, Receipt, Bot, BarChart3, Info, Trash2, Pin, PinOff, Clock, LineChart, Radio } from 'lucide-react';
+import { Plus, LayoutDashboard, FolderOpen, Receipt, Bot, BarChart3, Info, Trash2, Pin, PinOff, Clock, LineChart, Radio, type LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import { Task } from '../App';
 import type { TabType } from './MainContent';
@@ -15,9 +15,54 @@ interface SidebarProps {
   onOpenTab: (tabType: TabType, title: string, taskId?: string) => void;
 }
 
+interface NavItem {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  tabType: TabType;
+}
+
+const PRIMARY_NAV: NavItem[] = [
+  { id: 'home', label: '控制台', icon: LayoutDashboard, tabType: 'home' },
+];
+
+const MIDDLE_NAV: NavItem[] = [
+  { id: 'market', label: '行情', icon: LineChart, tabType: 'market' },
+  { id: 'files', label: '文件库', icon: FolderOpen, tabType: 'files' },
+  { id: 'schedule', label: '定时任务', icon: Clock, tabType: 'schedule' },
+  { id: 'monitor', label: '监控工作流', icon: Radio, tabType: 'monitor' },
+  { id: 'trading', label: '交易管理', icon: Receipt, tabType: 'trading' },
+  { id: 'agent', label: 'Agent', icon: Bot, tabType: 'agent' },
+];
+
+const BOTTOM_NAV: NavItem[] = [
+  { id: 'usage', label: '用量统计', icon: BarChart3, tabType: 'usage' },
+  { id: 'about', label: '关于本机', icon: Info, tabType: 'about' },
+];
+
 export function Sidebar({ tasks, onDeleteTask, onTogglePin, onMarkAsRead, currentTaskId, setCurrentTaskId, activeTabType, onOpenTab }: SidebarProps) {
-  const openTab = (tabType: TabType, title: string, taskId?: string) => {
-    onOpenTab(tabType, title, taskId);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; taskId: string } | null>(null);
+
+  const goToTab = (item: NavItem) => {
+    setCurrentTaskId(null);
+    onOpenTab(item.tabType, item.label);
+  };
+
+  const renderNavButton = (item: NavItem, extraClass = '') => {
+    const Icon = item.icon;
+    const active = activeTabType === item.tabType;
+    return (
+      <button
+        key={item.id}
+        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${extraClass} ${
+          active ? 'bg-gray-100 text-gray-900' : 'text-gray-700 hover:bg-gray-100'
+        }`}
+        onClick={() => goToTab(item)}
+      >
+        <Icon className="w-4 h-4 flex-shrink-0" />
+        <span className="text-sm">{item.label}</span>
+      </button>
+    );
   };
 
   const handleDeleteTask = (taskId: string) => {
@@ -29,25 +74,12 @@ export function Sidebar({ tasks, onDeleteTask, onTogglePin, onMarkAsRead, curren
     }
   };
 
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; taskId: string } | null>(null);
-
   const handleContextMenu = (e: React.MouseEvent, taskId: string) => {
     e.preventDefault();
     setContextMenu({ x: e.clientX, y: e.clientY, taskId });
   };
 
-  const handleCloseContextMenu = () => {
-    setContextMenu(null);
-  };
-
-  const navItems = [
-    { id: 'market', label: '行情', icon: LineChart, tabType: 'market' as const },
-    { id: 'files', label: '文件库', icon: FolderOpen, tabType: 'files' as const },
-    { id: 'schedule', label: '定时任务', icon: Clock, tabType: 'schedule' as const },
-    { id: 'monitor', label: '监控工作流', icon: Radio, tabType: 'monitor' as const },
-    { id: 'trading', label: '交易管理', icon: Receipt, tabType: 'trading' as const },
-    { id: 'agent', label: 'Agent', icon: Bot, tabType: 'agent' as const },
-  ];
+  const handleCloseContextMenu = () => setContextMenu(null);
 
   return (
     <aside className="h-full bg-white flex flex-col">
@@ -60,38 +92,8 @@ export function Sidebar({ tasks, onDeleteTask, onTogglePin, onMarkAsRead, curren
       {/* Main Navigation */}
       <nav className="flex-1 overflow-y-auto">
         <div className="p-3">
-          {/* 控制台 → 首页 */}
-          <button
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-              activeTabType === 'home' ? 'bg-gray-100 text-gray-900' : 'text-gray-700 hover:bg-gray-100'
-            }`}
-            onClick={() => {
-              setCurrentTaskId(null);
-              openTab('home', '首页');
-            }}
-          >
-            <LayoutDashboard className="w-4 h-4 flex-shrink-0" />
-            <span className="text-sm">控制台</span>
-          </button>
-
-          {navItems.map(item => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all mt-1 ${
-                  activeTabType === item.tabType ? 'bg-gray-100 text-gray-900' : 'text-gray-700 hover:bg-gray-100'
-                }`}
-                onClick={() => {
-                  setCurrentTaskId(null);
-                  openTab(item.tabType, item.label);
-                }}
-              >
-                <Icon className="w-4 h-4 flex-shrink-0" />
-                <span className="text-sm">{item.label}</span>
-              </button>
-            );
-          })}
+          {PRIMARY_NAV.map(item => renderNavButton(item))}
+          {MIDDLE_NAV.map(item => renderNavButton(item, 'mt-1'))}
         </div>
 
         {/* Tasks Section */}
@@ -106,7 +108,7 @@ export function Sidebar({ tasks, onDeleteTask, onTogglePin, onMarkAsRead, curren
               }`}
               onClick={() => {
                 setCurrentTaskId(null);
-                openTab('home', '首页');
+                onOpenTab('home', '首页');
               }}
             >
               <Plus className="w-3.5 h-3.5 flex-shrink-0" />
@@ -136,7 +138,7 @@ export function Sidebar({ tasks, onDeleteTask, onTogglePin, onMarkAsRead, curren
                     onContextMenu={(e) => handleContextMenu(e, task.id)}
                     onClick={() => {
                       setCurrentTaskId(task.id);
-                      openTab('chat', task.title, task.id);
+                      onOpenTab('chat', task.title, task.id);
                       if (task.hasUnread) {
                         onMarkAsRead(task.id);
                       }
@@ -163,31 +165,7 @@ export function Sidebar({ tasks, onDeleteTask, onTogglePin, onMarkAsRead, curren
 
       {/* Bottom Section */}
       <div className="p-3">
-        <button
-          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-            activeTabType === 'usage' ? 'bg-gray-100 text-gray-900' : 'text-gray-700 hover:bg-gray-100'
-          }`}
-          onClick={() => {
-            setCurrentTaskId(null);
-            openTab('usage', '用量统计');
-          }}
-        >
-          <BarChart3 className="w-4 h-4 flex-shrink-0" />
-          <span className="text-sm">用量统计</span>
-        </button>
-
-        <button
-          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all mt-1 ${
-            activeTabType === 'about' ? 'bg-gray-100 text-gray-900' : 'text-gray-700 hover:bg-gray-100'
-          }`}
-          onClick={() => {
-            setCurrentTaskId(null);
-            openTab('about', '关于本机');
-          }}
-        >
-          <Info className="w-4 h-4 flex-shrink-0" />
-          <span className="text-sm">关于本机</span>
-        </button>
+        {BOTTOM_NAV.map((item, idx) => renderNavButton(item, idx === 0 ? '' : 'mt-1'))}
       </div>
 
       {/* Context Menu */}
