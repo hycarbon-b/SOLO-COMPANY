@@ -1,11 +1,6 @@
-import {
-  Target, TrendingUp, Activity, Cpu,
-} from 'lucide-react';
-import * as React from 'react';
-import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
-import { ChatPanel } from './ChatPanel';
-import { ChatComposer } from './ChatComposer';
-import { RightPanelContainer } from './RightPanelContainer';
+import { HomeView } from './HomeView';
+import { WebView } from './WebView';
+import { ChatView } from './ChatView';
 import { FilesPage } from './FilesPage';
 import { TradingPage } from './TradingPage';
 import { AgentPage } from './AgentPage';
@@ -39,21 +34,24 @@ interface MainContentProps {
   onCloseTab: (tabId: string) => void;
 }
 
-
-
-
-export function MainContent({ onAddTask, tasks, onUpdateTaskTitle, onUpdateTaskStatus, tabs, activeTabId, onOpenTab: handleOpenTab, onCloseTab: _handleCloseTab }: MainContentProps) {
-  // === Tab State ===
+export function MainContent({
+  onAddTask,
+  tasks,
+  onUpdateTaskTitle,
+  onUpdateTaskStatus,
+  tabs,
+  activeTabId,
+  onOpenTab: handleOpenTab,
+  onCloseTab: _handleCloseTab,
+}: MainContentProps) {
   const activeTab = tabs.find(t => t.id === activeTabId);
   const effectiveTaskId = activeTab?.type === 'chat' ? activeTab.taskId ?? null : null;
 
-  // === Chat Session (state + persistence + send/agent flows) ===
   const {
     inputValue,
     setInputValue,
     messagesMap,
     isTyping,
-    messages,
     messagesEndRef,
     handleSendMessage,
     handleAgentStartChat,
@@ -66,14 +64,10 @@ export function MainContent({ onAddTask, tasks, onUpdateTaskTitle, onUpdateTaskS
     onOpenTab: handleOpenTab,
   });
 
-  // === Content Renderer (rendered inside the tab bar) ===
   const renderContent = () => {
-    const tab = activeTab;
-    if (!tab) return null;
+    if (!activeTab) return null;
 
-    switch (tab.type) {
-      case 'home':
-        return renderHomeContent();
+    switch (activeTab.type) {
       case 'files':
         return <FilesPage />;
       case 'trading':
@@ -90,101 +84,37 @@ export function MainContent({ onAddTask, tasks, onUpdateTaskTitle, onUpdateTaskS
         return <UsagePage />;
       case 'about':
         return <AboutPage />;
-      case 'chat':
-        return renderChatContent(tab.taskId ?? null);
       case 'web':
-        return renderWebContent(tab.url ?? '');
+        return <WebView url={activeTab.url ?? ''} />;
+      case 'chat': {
+        const taskId = activeTab.taskId ?? null;
+        return (
+          <ChatView
+            taskId={taskId}
+            taskTitle={tasks.find(t => t.id === taskId)?.title}
+            messages={taskId ? (messagesMap[taskId] || []) : []}
+            isTyping={isTyping}
+            inputValue={inputValue}
+            setInputValue={setInputValue}
+            onSendMessage={handleSendMessage}
+            messagesEndRef={messagesEndRef}
+            onUpdateTaskTitle={onUpdateTaskTitle}
+            onOpenTab={handleOpenTab}
+            onAgentTaskComplete={handleAgentTaskComplete}
+          />
+        );
+      }
+      case 'home':
       default:
-        return renderHomeContent();
+        return (
+          <HomeView
+            inputValue={inputValue}
+            setInputValue={setInputValue}
+            onSendMessage={handleSendMessage}
+          />
+        );
     }
   };
 
-  const renderHomeContent = () => (
-    <main className="h-full flex overflow-hidden bg-white">
-      <div className="flex-1 flex flex-col items-center justify-center px-6 bg-white">
-          <div className="w-full max-w-3xl">
-            <h1 className="text-4xl text-center mb-12 text-gray-900">我能为你做什么？</h1>
-            <div className="relative mb-6">
-              <ChatComposer
-                inputValue={inputValue}
-                onInputChange={setInputValue}
-                onSend={handleSendMessage}
-                variant="home"
-              />
-            </div>
-            <div className="flex flex-wrap justify-center gap-3 mt-2">
-              <QuickAction icon={Target} text="智能选股" onClick={() => setInputValue('帮我智能选股')} />
-              <QuickAction icon={TrendingUp} text="行情分析" onClick={() => setInputValue('分析当前市场行情')} />
-              <QuickAction icon={Activity} text="技术分析" onClick={() => setInputValue('进行技术分析')} />
-              <QuickAction icon={Cpu} text="策略生成" onClick={() => setInputValue('生成交易策略')} />
-            </div>
-          </div>
-        </div>
-    </main>
-  );
-
-  const renderWebContent = (url: string) => {
-    if (!url) {
-      return (
-        <main className="h-full flex items-center justify-center bg-white text-gray-500">
-          未提供网址
-        </main>
-      );
-    }
-    return (
-      <main className="h-full flex flex-col bg-white">
-        <div className="px-4 py-2 border-b border-gray-100 text-xs text-gray-500 truncate" title={url}>
-          {url}
-        </div>
-        <div className="flex-1 overflow-hidden">
-          {/* Electron webview 标签用于嵌入外部网页 */}
-          {React.createElement('webview', {
-            src: url,
-            style: { width: '100%', height: '100%', display: 'inline-flex' },
-            allowpopups: 'true',
-          })}
-        </div>
-      </main>
-    );
-  };
-
-  const renderChatContent = (taskId: string | null) => {
-    const chatMessages = taskId ? (messagesMap[taskId] || []) : [];
-    const chatTask = tasks.find(t => t.id === taskId);    return (
-      <main className="h-full flex overflow-hidden bg-white">
-        <PanelGroup direction="horizontal" className="flex-1">
-          <Panel defaultSize={75} minSize={50}>
-            <ChatPanel
-              messages={chatMessages}
-              isTyping={isTyping}
-              inputValue={inputValue}
-              setInputValue={setInputValue}
-              onSendMessage={handleSendMessage}
-              messagesEndRef={messagesEndRef}
-              taskTitle={chatTask?.title}
-              onUpdateTitle={(newTitle) => taskId && onUpdateTaskTitle(taskId, newTitle)}
-              onOpenTab={handleOpenTab}
-            />
-          </Panel>
-          <PanelResizeHandle className="w-1 bg-gray-200 hover:bg-blue-400 transition-colors cursor-col-resize" />
-          <RightPanelContainer onAgentTaskComplete={handleAgentTaskComplete} />
-        </PanelGroup>
-      </main>
-    );
-  };
-
-  return (
-    <div className="h-full overflow-hidden">
-      {renderContent()}
-    </div>
-  );
-}
-
-function QuickAction({ icon: Icon, text, onClick }: { icon: any; text: string; onClick?: () => void }) {
-  return (
-    <button className="flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-sm hover:shadow-md transition-all" onClick={onClick}>
-      <Icon className="w-4 h-4 text-gray-600" />
-      <span className="text-sm text-gray-700">{text}</span>
-    </button>
-  );
+  return <div className="h-full overflow-hidden">{renderContent()}</div>;
 }

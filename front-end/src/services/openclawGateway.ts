@@ -50,7 +50,7 @@ function loadGatewayConfig(): GatewayConfig {
   return { GATEWAY_HTTP_URL: gatewayUrl, GATEWAY_WS_URL: wsUrl, GATEWAY_KEY: gatewayKey }
 }
 
-let config = loadGatewayConfig()
+const config = loadGatewayConfig()
 
 const STORAGE_KEY = 'openclaw-token'
 
@@ -61,7 +61,6 @@ export function getToken(): string {
 export function getGatewayConfig(): GatewayConfig {
   return config
 }
-
 // ===== WebSocket 连接 =====
 
 interface ExtWebSocket extends WebSocket {
@@ -81,11 +80,10 @@ let messageId = 0
 const pendingRequests = new Map<string, PendingRequest>()
 
 function rejectRequest(id: string, error: Error) {
-  if (pendingRequests.has(id)) {
-    const req = pendingRequests.get(id)!
-    pendingRequests.delete(id)
-    req.reject(error)
-  }
+  const req = pendingRequests.get(id)
+  if (!req) return
+  pendingRequests.delete(id)
+  req.reject(error)
 }
 
 function handleGatewayMessage(data: any) {
@@ -108,12 +106,8 @@ function handleGatewayMessage(data: any) {
   let matchedReq: PendingRequest | null = null
   let matchedId = ''
   for (const [reqId, req] of pendingRequests) {
-    const matched =
-      payload.sessionKey &&
-      (payload.sessionKey === req.sessionKey ||
-        payload.sessionKey.endsWith(req.sessionKey) ||
-        req.sessionKey.endsWith(payload.sessionKey))
-    if (matched) {
+    const sk = payload.sessionKey
+    if (sk && (sk === req.sessionKey || sk.endsWith(req.sessionKey) || req.sessionKey.endsWith(sk))) {
       matchedReq = req
       matchedId = reqId
       break
