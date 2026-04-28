@@ -1,6 +1,5 @@
 import {
-  Mic, ArrowUp, Target, TrendingUp, Activity, Cpu,
-  HardDrive, Upload
+  Target, TrendingUp, Activity, Cpu,
 } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import * as React from 'react';
@@ -9,15 +8,14 @@ import { loadMessages, saveMessages, loadSysPrompt, saveSysPrompt } from '../../
 import chatConfig from '../config/chatConfig.json';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { ChatPanel } from './ChatPanel';
-import { FileLibraryModal } from './FileLibraryModal';
-import { AttachmentPreviewList } from './AttachmentPreviewList';
+import { ChatComposer } from './ChatComposer';
 import { RightPanelContainer } from './RightPanelContainer';
 import { FilesPage } from './FilesPage';
 import { TradingPage } from './TradingPage';
 import { AgentPage, type AgentInfo } from './AgentPage';
 import type { DiscussionThread } from '../../types/discussion';
-import type { Message, LibraryFile } from '../fakeChatData';
-import { libraryFiles, fakeMessagesMap } from '../fakeChatData';
+import type { Message } from '../fakeChatData';
+import { fakeMessagesMap } from '../fakeChatData';
 import { UsagePage } from './UsagePage';
 import { AboutPage } from './AboutPage';
 import { SchedulePage } from './SchedulePage';
@@ -63,15 +61,6 @@ export function MainContent({ onAddTask, tasks, onUpdateTaskTitle, onUpdateTaskS
 
   // === Chat State ===
   const [inputValue, setInputValue] = useState('');
-  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
-  const [attachedLibraryFiles, setAttachedLibraryFiles] = useState<LibraryFile[]>([]);
-  const [showFileLibrary, setShowFileLibrary] = useState(false);
-  const [libraryActiveTab, setLibraryActiveTab] = useState('全部');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const filteredLibraryFiles = libraryActiveTab === '全部'
-    ? libraryFiles
-    : libraryFiles.filter(f => f.type === libraryActiveTab);
 
   const [messagesMap, setMessagesMap] = useState<Record<string, Message[]>>({
     ...fakeMessagesMap,
@@ -257,8 +246,6 @@ export function MainContent({ onAddTask, tasks, onUpdateTaskTitle, onUpdateTaskS
     }
 
     setInputValue('');
-    setAttachedFiles([]);
-    setAttachedLibraryFiles([]);
 
     if (!taskIdToUse) return;
     const taskId = taskIdToUse;
@@ -328,27 +315,6 @@ export function MainContent({ onAddTask, tasks, onUpdateTaskTitle, onUpdateTaskS
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inputValue, effectiveTaskId, onAddTask, onUpdateTaskStatus]);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files) {
-      setAttachedFiles(prev => [...prev, ...Array.from(files)]);
-    }
-  };
-
-  const handleRemoveFile = (index: number) => {
-    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleSelectLibraryFile = (file: LibraryFile) => {
-    if (!attachedLibraryFiles.find(f => f.id === file.id)) {
-      setAttachedLibraryFiles(prev => [...prev, file]);
-    }
-  };
-
-  const handleRemoveLibraryFile = (fileId: string) => {
-    setAttachedLibraryFiles(prev => prev.filter(f => f.id !== fileId));
-  };
-
   // === Content Renderer (rendered inside the tab bar) ===
   const renderContent = () => {
     const tab = activeTab;
@@ -388,51 +354,12 @@ export function MainContent({ onAddTask, tasks, onUpdateTaskTitle, onUpdateTaskS
           <div className="w-full max-w-3xl">
             <h1 className="text-4xl text-center mb-12 text-gray-900">我能为你做什么？</h1>
             <div className="relative mb-6">
-              <div className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow border border-blue-100">
-                <AttachmentPreviewList
-                  attachedFiles={attachedFiles}
-                  attachedLibraryFiles={attachedLibraryFiles}
-                  onRemoveFile={handleRemoveFile}
-                  onRemoveLibraryFile={handleRemoveLibraryFile}
-                />
-                <div className="p-4">
-                  <input
-                    type="text"
-                    placeholder="分配具体工作或提问任何问题"
-                    className="w-full text-gray-600 placeholder-gray-400 bg-transparent outline-none"
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && inputValue.trim()) {
-                        handleSendMessage();
-                      }
-                    }}
-                  />
-                </div>
-                <div className="flex items-center justify-between px-4 pb-3 pt-3">
-                  <div className="flex items-center gap-2">
-                    <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileSelect} accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" />
-                    <button onClick={() => setShowFileLibrary(true)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="从文件库添加">
-                      <HardDrive className="w-5 h-5" />
-                    </button>
-                    <button onClick={() => fileInputRef.current?.click()} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="从本地上传">
-                      <Upload className="w-5 h-5" />
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                      <Mic className="w-5 h-5" />
-                    </button>
-                    <button
-                      className="p-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                      disabled={!inputValue.trim()}
-                      onClick={handleSendMessage}
-                    >
-                      <ArrowUp className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <ChatComposer
+                inputValue={inputValue}
+                onInputChange={setInputValue}
+                onSend={handleSendMessage}
+                variant="home"
+              />
             </div>
             <div className="flex flex-wrap justify-center gap-3 mt-2">
               <QuickAction icon={Target} text="智能选股" onClick={() => setInputValue('帮我智能选股')} />
@@ -442,16 +369,6 @@ export function MainContent({ onAddTask, tasks, onUpdateTaskTitle, onUpdateTaskS
             </div>
           </div>
         </div>
-      {showFileLibrary && (
-        <FileLibraryModal
-          libraryActiveTab={libraryActiveTab}
-          attachedLibraryFiles={attachedLibraryFiles}
-          filteredLibraryFiles={filteredLibraryFiles}
-          onTabChange={setLibraryActiveTab}
-          onSelectLibraryFile={handleSelectLibraryFile}
-          onClose={() => setShowFileLibrary(false)}
-        />
-      )}
     </main>
   );
 
