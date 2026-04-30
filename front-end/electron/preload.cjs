@@ -28,4 +28,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('inject-html', handler)
     return () => ipcRenderer.removeListener('inject-html', handler)
   },
+
+  // === WS frame capture (per-conversation JSONL persistence) ===
+  wsCaptureAppend: (record) => ipcRenderer.invoke('wsCapture:append', record),
+  wsCaptureList: () => ipcRenderer.invoke('wsCapture:list'),
+  wsCaptureRead: (sessionKey) => ipcRenderer.invoke('wsCapture:read', sessionKey),
 });

@@ -431,6 +431,68 @@ function startOpenUrlHttpServer() {
   })
 }
 
+// === WebSocket frame capture: persists every WS frame per conversation ===
+// Files live under <userData>/ws-captures/<sessionKey>.jsonl
+// Each line: { ts, dir: 'SEND'|'RECV', sessionKey, taskId?, data }
+const wsCaptureDir = path.join(app.getPath('userData'), 'ws-captures')
+try { fs.mkdirSync(wsCaptureDir, { recursive: true }) } catch (e) { debug('[ws-capture] mkdir failed:', e.message) }
+debug('[ws-capture] directory:', wsCaptureDir)
+
+function sanitizeForFilename(s) {
+  return String(s || '_unbound').replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 120) || '_unbound'
+}
+
+ipcMain.handle('wsCapture:append', async (_evt, record) => {
+  try {
+    if (!record || typeof record !== 'object') return { ok: false, error: 'invalid record' }
+    const sk = sanitizeForFilename(record.sessionKey)
+    const file = path.join(wsCaptureDir, `${sk}.jsonl`)
+    const line = JSON.stringify({
+      ts: record.ts || Date.now(),
+      dir: record.dir,
+      sessionKey: record.sessionKey || null,
+      taskId: record.taskId || null,
+      data: record.data,
+    }) + '\n'
+    await fs.promises.appendFile(file, line, 'utf8')
+    return { ok: true }
+  } catch (e) {
+    debug('[ws-capture] append error:', e.message)
+    return { ok: false, error: e.message }
+  }
+})
+
+ipcMain.handle('wsCapture:list', async () => {
+  try {
+    const files = await fs.promises.readdir(wsCaptureDir)
+    const out = []
+    for (const f of files) {
+      if (!f.endsWith('.jsonl')) continue
+      try {
+        const st = await fs.promises.stat(path.join(wsCaptureDir, f))
+        out.push({ name: f, sessionKey: f.replace(/\.jsonl$/, ''), size: st.size, mtime: st.mtimeMs })
+      } catch {}
+    }
+    out.sort((a, b) => b.mtime - a.mtime)
+    return { ok: true, dir: wsCaptureDir, files: out }
+  } catch (e) {
+    return { ok: false, error: e.message }
+  }
+})
+
+ipcMain.handle('wsCapture:read', async (_evt, sessionKey) => {
+  try {
+    const sk = sanitizeForFilename(sessionKey)
+    const file = path.join(wsCaptureDir, `${sk}.jsonl`)
+    if (!fs.existsSync(file)) return { ok: true, lines: [] }
+    const text = await fs.promises.readFile(file, 'utf8')
+    const lines = text.split('\n').filter(Boolean).map(l => { try { return JSON.parse(l) } catch { return null } }).filter(Boolean)
+    return { ok: true, lines, file }
+  } catch (e) {
+    return { ok: false, error: e.message }
+  }
+})
+
 app.whenReady().then(async () => {
   debug('App ready, calling createWindow...')
   try {

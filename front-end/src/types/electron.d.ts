@@ -22,6 +22,27 @@ export interface ElectronAPI {
   watchResourceFiles: () => Promise<{ success: boolean }>;
   unwatchResourceFiles: () => Promise<{ success: boolean }>;
   onResourceChanged: (callback: (data: { files: ResourceFile[] }) => void) => void;
+
+  // WS frame capture per-conversation persistence
+  wsCaptureAppend?: (record: {
+    ts?: number
+    dir: 'SEND' | 'RECV'
+    sessionKey?: string
+    taskId?: string
+    data: unknown
+  }) => Promise<{ ok: boolean; error?: string }>;
+  wsCaptureList?: () => Promise<{
+    ok: boolean
+    dir?: string
+    files?: { name: string; sessionKey: string; size: number; mtime: number }[]
+    error?: string
+  }>;
+  wsCaptureRead?: (sessionKey: string) => Promise<{
+    ok: boolean
+    file?: string
+    lines?: any[]
+    error?: string
+  }>;
 }
 
 declare global {

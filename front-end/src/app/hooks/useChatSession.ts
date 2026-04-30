@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { callOpenClawGateway } from '../../services/openclawGateway';
-import { loadMessages, saveMessages, loadSysPrompt, saveSysPrompt } from '../../services/conversationStore';
+import { callOpenClawGateway, createSessionKey, subscribeAgentEvents } from '../../services/openclawGateway';
+import {
+  loadMessages, saveMessages, loadSysPrompt, saveSysPrompt,
+  loadSessionKey, saveSessionKey,
+} from '../../services/conversationStore';
 import { reduceToolCalls, type ToolCallSnapshot } from '../../types/agentStream';
 import chatConfig from '../config/chatConfig.json';
 import type { Message } from '../fakeChatData';
@@ -34,6 +37,9 @@ export function useChatSession({
   const [systemPromptsMap, setSystemPromptsMap] = useState<Record<string, string>>({});
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // 任务级 sessionKey 映射：同一 task 的多轮对话必须复用同一个 sessionKey，
+  // 以保证 OpenClaw Gateway 能识别为同一个上下文会话。
+  const sessionKeyMapRef = useRef<Record<string, string>>({});
 
   // Load messages when a chat tab opens
   useEffect(() => {
@@ -228,8 +234,35 @@ export function useChatSession({
     let currentAsstMsgId = assistantMsgId;
     appendMsg({ id: assistantMsgId, role: 'assistant', content: '', timestamp: new Date() });
 
+    // 任务级 sessionKey：首次发送时生成并持久化，后续轮次复用
+    let sessionKey = sessionKeyMapRef.current[taskId];
+    if (!sessionKey) {
+      sessionKey = loadSessionKey(taskId) || createSessionKey('tradingbase');
+      sessionKeyMapRef.current[taskId] = sessionKey;
+      if (!isSeedTaskId(taskId)) saveSessionKey(taskId, sessionKey);
+    }
+
     // 工具调用快照表（同 run 内累积），实时回写到当前 assistant 消息
     let toolCallMap: Record<string, ToolCallSnapshot> = {};
+    let boundRunId: string | undefined;
+
+    // 订阅全局 agent 事件总线：按 sessionKey + runId 过滤本轮事件。
+    // 这样 subagent 派生的 item 帧（在 parent runId 下）也会被收录；
+    // 卸载时机为 callOpenClawGateway resolve 之后（finally）。
+    const unsubscribeAgent = subscribeAgentEvents(evt => {
+      if (evt.stream !== 'item' && evt.stream !== 'command_output') return;
+      // sessionKey 后缀匹配（gateway 实际 sk 是 agent:main:<userKey>）
+      const sk = evt.sessionKey || '';
+      if (!sk.endsWith(sessionKey) && sk !== sessionKey) return;
+      // 锁定本轮 runId，过滤同 sessionKey 后续 followup 的串扰
+      if (!boundRunId) boundRunId = evt.runId;
+      else if (evt.runId && evt.runId !== boundRunId) return;
+      toolCallMap = reduceToolCalls(toolCallMap, evt);
+      const list = Object.values(toolCallMap).sort(
+        (a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0)
+      );
+      patchMsg(currentAsstMsgId, () => ({ toolCalls: list }));
+    });
 
     setIsTyping(true);
 
@@ -238,25 +271,19 @@ export function useChatSession({
       const finalSystemPrompt = sysPrompt.replace('{{CONVERSATION_ID}}', taskId);
       const { text } = await callOpenClawGateway(
         userContent,
-        (_chunk, accumulated, isNewSegment) => {
-          setIsTyping(false);
-          if (isNewSegment) {
-            const newMsgId = genMsgId('assistant');
-            currentAsstMsgId = newMsgId;
-            appendMsg({ id: newMsgId, role: 'assistant', content: accumulated, timestamp: new Date() });
-            return;
-          }
-          patchMsg(currentAsstMsgId, () => ({ content: accumulated }));
-        },
-        finalSystemPrompt,
-        (evt) => {
-          // 仅消费工具相关 stream，assistant/lifecycle 不影响 toolCalls
-          if (evt.stream !== 'item' && evt.stream !== 'command_output') return;
-          toolCallMap = reduceToolCalls(toolCallMap, evt);
-          const list = Object.values(toolCallMap).sort(
-            (a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0)
-          );
-          patchMsg(currentAsstMsgId, () => ({ toolCalls: list }));
+        {
+          sessionKey,
+          systemPrompt: finalSystemPrompt,
+          onStream: (_chunk, accumulated, isNewSegment) => {
+            setIsTyping(false);
+            if (isNewSegment) {
+              const newMsgId = genMsgId('assistant');
+              currentAsstMsgId = newMsgId;
+              appendMsg({ id: newMsgId, role: 'assistant', content: accumulated, timestamp: new Date() });
+              return;
+            }
+            patchMsg(currentAsstMsgId, () => ({ content: accumulated }));
+          },
         }
       );
 
@@ -269,6 +296,9 @@ export function useChatSession({
       }));
       onUpdateTaskStatus(taskId, 'error');
     } finally {
+      // 延迟取消订阅：chat/final 可能与最后几帧 item/command_output 几乎同时到达。
+      // 给 300ms 缓冲，确保同批 WS 帧全部处理完毕后再释放订阅。
+      setTimeout(() => unsubscribeAgent(), 300);
       setIsTyping(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -42,7 +42,8 @@ function ToolCallItem({ call }: { call: ToolCallSnapshot }) {
 
   // 显示文本：优先 output > progressText
   const display = call.output ?? call.progressText ?? '';
-  const hasDetail = display.length > 0 || call.cwd || call.exitCode !== undefined;
+  // meta 在没有 output/progressText 时作为"调用参数"兜底展示
+  const hasDetail = display.length > 0 || !!call.meta || call.cwd !== undefined || call.exitCode !== undefined;
 
   return (
     <div className="border border-gray-200 rounded-lg bg-gray-50/60 text-sm">
@@ -79,10 +80,18 @@ function ToolCallItem({ call }: { call: ToolCallSnapshot }) {
               )}
             </div>
           )}
+          {/* 有 output/progressText 时展示执行结果 */}
           {display && (
             <pre className="text-xs font-mono text-gray-700 bg-white border border-gray-200 rounded p-2 overflow-x-auto whitespace-pre-wrap break-all max-h-72 overflow-y-auto">
               {stripAnsi(display)}
             </pre>
+          )}
+          {/* 无 output 时把调用参数 (meta) 作为兜底信息 */}
+          {!display && call.meta && (
+            <div className="text-xs text-gray-500">
+              <span className="text-gray-400 mr-1">args:</span>
+              <span className="font-mono text-gray-600 break-all">{call.meta}</span>
+            </div>
           )}
         </div>
       )}

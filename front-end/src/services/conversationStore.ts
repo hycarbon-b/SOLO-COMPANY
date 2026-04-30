@@ -6,6 +6,7 @@
  *   yuanji:tasks          → StoredTask[]
  *   yuanji:msgs:{id}      → StoredMessage[]
  *   yuanji:sys:{id}       → string (system prompt)
+ *   yuanji:sk:{id}        → string (OpenClaw Gateway sessionKey, 任务级复用)
  */
 
 import type { ToolCallSnapshot } from '../types/agentStream';
@@ -34,6 +35,7 @@ interface StoredMessage {
 const TASKS_KEY = 'yuanji:tasks';
 const msgsKey = (id: string) => `yuanji:msgs:${id}`;
 const sysKey  = (id: string) => `yuanji:sys:${id}`;
+const skKey   = (id: string) => `yuanji:sk:${id}`;
 
 function safeRead<T>(key: string, fallback: T): T {
   try {
@@ -78,6 +80,15 @@ export function loadSysPrompt(taskId: string): string | undefined {
 
 export function saveSysPrompt(taskId: string, prompt: string): void {
   localStorage.setItem(sysKey(taskId), prompt);
+}
+
+// ── Session key (OpenClaw Gateway) ────────────────────────────────────────────
+export function loadSessionKey(taskId: string): string | null {
+  return localStorage.getItem(skKey(taskId));
+}
+
+export function saveSessionKey(taskId: string, sk: string): void {
+  localStorage.setItem(skKey(taskId), sk);
 }
 
 // ── Reset all ─────────────────────────────────────────────────────────────────

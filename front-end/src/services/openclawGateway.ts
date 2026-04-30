@@ -29,6 +29,37 @@ function logWs(prefix: string, data: unknown) {
   if (_wsLogBuffer.length >= WS_LOG_MAX) _wsLogBuffer.shift()
   _wsLogBuffer.push(entry)
   _wsLogSubscribers.forEach(fn => fn(entry))
+  // 持久化到 electron 主进程：每个 sessionKey 一份 JSONL
+  persistWsFrame(prefix as 'SEND' | 'RECV', data, entry.ts)
+}
+
+/**
+ * 从一帧数据中尽力提取 sessionKey。
+ * - SEND: chat.send 的 params.sessionKey；connect/auth 帧没有 sessionKey
+ * - RECV: event 帧的 payload.sessionKey；res 帧通过 id 反查 pendingRequests
+ */
+function extractSessionKey(data: any): string | undefined {
+  if (!data || typeof data !== 'object') return undefined
+  if (data.params && typeof data.params.sessionKey === 'string') return data.params.sessionKey
+  if (data.payload && typeof data.payload.sessionKey === 'string') return data.payload.sessionKey
+  if (data.id && pendingRequests.has(data.id)) return pendingRequests.get(data.id)?.sessionKey
+  return undefined
+}
+
+/**
+ * 把一帧 WS 数据通过 electron preload 写入到磁盘 JSONL，
+ * 同一 sessionKey 的所有帧（含 SEND/RECV）写入同一文件，方便回放与离线分析。
+ * 在非 electron 环境下静默跳过。
+ */
+function persistWsFrame(dir: 'SEND' | 'RECV', data: unknown, ts: number) {
+  try {
+    const api = (globalThis as any).window?.electronAPI
+    if (!api || typeof api.wsCaptureAppend !== 'function') return
+    const sk = extractSessionKey(data)
+    api.wsCaptureAppend({ ts, dir, sessionKey: sk, data }).catch(() => {})
+  } catch {
+    /* noop */
+  }
 }
 
 /**
@@ -111,12 +142,15 @@ interface ExtWebSocket extends WebSocket {
 interface PendingRequest {
   sessionKey: string
   onStream?: ((chunk: string, accumulated: string, isNewSegment?: boolean) => void) | null
-  /** 工具流事件回调，按 runId 绑定后接收所有 stream 类型 */
-  onAgentEvent?: ((evt: AgentStreamEvent) => void) | null
   _accumulatedText: string
-  _boundRunId?: string
   resolve: (result: { text: string }) => void
   reject: (err: Error) => void
+}
+
+/** sessionKey 匹配：后台实际 sk 为 `agent:main:<userKey>`，双向后缀匹配。 */
+function sessionKeyMatches(payloadSk: string | undefined, reqSk: string): boolean {
+  if (!payloadSk) return false
+  return payloadSk === reqSk || payloadSk.endsWith(reqSk) || reqSk.endsWith(payloadSk)
 }
 
 let ws: ExtWebSocket | null = null
@@ -152,44 +186,23 @@ function handleGatewayMessage(data: any) {
   if (data.type !== 'event' || !data.event || !data.payload) return
   const payload = data.payload
 
-  // 找到匹配的 pending 请求（通过 sessionKey）
-  let matchedReq: PendingRequest | null = null
-  let matchedId = ''
-  for (const [reqId, req] of pendingRequests) {
-    const sk = payload.sessionKey
-    if (sk && (sk === req.sessionKey || sk.endsWith(req.sessionKey) || req.sessionKey.endsWith(sk))) {
-      matchedReq = req
-      matchedId = reqId
-      break
-    }
-  }
-  if (!matchedReq) return
-
-  const req = matchedReq
-  const reqId = matchedId
-
-  // === agent 事件：流式文本（payload.data.text 是全量累积文本）===
+  // === agent 事件：先全局广播（不受 pendingRequest 约束），
+  //    再为命中 sessionKey 的 pending 请求维护 assistant 文本累积。 ===
   if (data.event === 'agent') {
-    // 1) 优先按 typed stream 分发到全局总线 + 请求级 onAgentEvent
     const stream = payload.stream as AgentStreamEvent['stream'] | undefined
     if (stream === 'lifecycle' || stream === 'item' || stream === 'command_output' || stream === 'assistant') {
-      const evt = {
+      emitAgentEvent({
         runId: payload.runId,
         seq: payload.seq,
         ts: payload.ts,
         sessionKey: payload.sessionKey,
         stream,
         data: payload.data,
-      } as AgentStreamEvent
-      // 绑定 runId（防止 followup run 串扰）
-      if (!req._boundRunId && evt.runId) req._boundRunId = evt.runId
-      if (!req._boundRunId || req._boundRunId === evt.runId) {
-        req.onAgentEvent?.(evt)
-      }
-      emitAgentEvent(evt)
+      } as AgentStreamEvent)
     }
 
-    // 2) 仍按旧逻辑维护 assistant 文本累积，保持向后兼容
+    const req = findPendingBySessionKey(payload.sessionKey)
+    if (!req) return
     const d = payload.data
     if (d && typeof d.text === 'string' && d.text.length > 0) {
       const newText: string = d.text
@@ -210,13 +223,15 @@ function handleGatewayMessage(data: any) {
 
   // === chat 事件：最终完成 / 错误 ===
   if (data.event === 'chat') {
+    const match = findPendingEntryBySessionKey(payload.sessionKey)
+    if (!match) return
+    const [reqId, req] = match
     if (payload.state === 'error') {
       pendingRequests.delete(reqId)
       req.reject(new Error(payload.errorMessage || 'Gateway error'))
       return
     }
     if (payload.state === 'final') {
-      // 优先用流式累积文本
       let text = req._accumulatedText
       if (!text && payload.message) {
         const msg = payload.message
@@ -230,6 +245,19 @@ function handleGatewayMessage(data: any) {
       req.resolve({ text: text || '' })
     }
   }
+}
+
+function findPendingBySessionKey(sk: string | undefined): PendingRequest | null {
+  const m = findPendingEntryBySessionKey(sk)
+  return m ? m[1] : null
+}
+
+function findPendingEntryBySessionKey(sk: string | undefined): [string, PendingRequest] | null {
+  if (!sk) return null
+  for (const entry of pendingRequests) {
+    if (sessionKeyMatches(sk, entry[1].sessionKey)) return entry
+  }
+  return null
 }
 
 /**
@@ -313,43 +341,58 @@ function getWebSocket(): Promise<ExtWebSocket> {
 // ===== 公开 API =====
 
 /**
- * 通过 OpenClaw Gateway 发送消息，支持流式回调。
- * @param message 用户消息内容
- * @param onStream 流式回调，每次有新内容时调用 (chunk, accumulated)
- * @param systemPrompt 可选的系统提示词，用于设定 AI 角色和场景
- * @param onAgentEvent 可选的工具流事件回调，按 runId 绑定，接收 lifecycle/item/command_output/assistant
+ * 生成一个文件会话级 sessionKey。同一项任务需要复用，以保证 Gateway 上下文连贯。
+ */
+export function createSessionKey(prefix = 'tradingbase'): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+export interface CallGatewayOptions {
+  /** 会话级 sessionKey，同一项任务多轮调用必须传同一个值。未传时会生成一次性 sessionKey。 */
+  sessionKey?: string
+  onStream?: ((chunk: string, accumulated: string, isNewSegment?: boolean) => void) | null
+  systemPrompt?: string
+}
+
+/**
+ * 通过 OpenClaw Gateway 发送消息。返回的 sessionKey 是本次调用实际使用的值，
+ * 调用者可以在同一任务下次复用。
+ *
+ * 注意：agent stream（lifecycle / item / command_output / assistant）不再提供请求级回调，
+ * 请使用 `subscribeAgentEvents` 全局订阅，并在订阅者处按 sessionKey + runId 过滤。
  */
 export async function callOpenClawGateway(
   message: string,
-  onStream?: ((chunk: string, accumulated: string, isNewSegment?: boolean) => void) | null,
-  systemPrompt?: string,
-  onAgentEvent?: ((evt: AgentStreamEvent) => void) | null
-): Promise<{ text: string }> {
+  onStreamOrOpts?: CallGatewayOptions | ((chunk: string, accumulated: string, isNewSegment?: boolean) => void) | null,
+  systemPrompt?: string
+): Promise<{ text: string; sessionKey: string }> {
+  // 兼容旧签名 (message, onStream, systemPrompt)
+  let opts: CallGatewayOptions
+  if (typeof onStreamOrOpts === 'function') {
+    opts = { onStream: onStreamOrOpts, systemPrompt }
+  } else {
+    opts = { ...(onStreamOrOpts ?? {}) }
+    if (systemPrompt && !opts.systemPrompt) opts.systemPrompt = systemPrompt
+  }
+
   const socket = await getWebSocket()
   const id = `${Date.now()}-${++messageId}-${Math.random().toString(36).slice(2, 8)}`
-  const sessionKey = `tradingbase-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  const sessionKey = opts.sessionKey || createSessionKey()
 
-  return new Promise((resolve, reject) => {
+  const result = await new Promise<{ text: string }>((resolve, reject) => {
     const timeout = setTimeout(() => {
       rejectRequest(id, new Error('请求超时，请检查 OpenClaw Gateway 是否正常运行'))
     }, 600000)
 
     pendingRequests.set(id, {
       sessionKey,
-      onStream,
-      onAgentEvent,
+      onStream: opts.onStream,
       _accumulatedText: '',
-      resolve: (result) => {
-        clearTimeout(timeout)
-        resolve(result)
-      },
-      reject: (err) => {
-        clearTimeout(timeout)
-        reject(err)
-      },
+      resolve: (r) => { clearTimeout(timeout); resolve(r) },
+      reject: (err) => { clearTimeout(timeout); reject(err) },
     })
 
-    const finalMessage = systemPrompt ? `${systemPrompt}\n\n${message}` : message
+    const finalMessage = opts.systemPrompt ? `${opts.systemPrompt}\n\n${message}` : message
     const params: Record<string, string> = { message: finalMessage, sessionKey, idempotencyKey: id }
 
     socket.send(
@@ -362,6 +405,8 @@ export async function callOpenClawGateway(
     )
     logWs('SEND', { type: 'req', id, method: 'chat.send', params })
   })
+
+  return { ...result, sessionKey }
 }
 
 /**
