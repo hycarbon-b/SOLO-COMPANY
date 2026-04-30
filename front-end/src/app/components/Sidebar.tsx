@@ -1,4 +1,4 @@
-import { Plus, LayoutDashboard, FolderOpen, Receipt, Bot, BarChart3, Info, Trash2, Pin, PinOff, Clock, LineChart, Radio, type LucideIcon } from 'lucide-react';
+import { Plus, LayoutDashboard, FolderOpen, Receipt, Bot, BarChart3, Info, Trash2, Pin, PinOff, Clock, LineChart, Radio, Terminal, type LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import { Task } from '../App';
 import type { TabType } from './MainContent';
@@ -31,6 +31,7 @@ const MIDDLE_NAV: NavItem[] = [
   { id: 'files', label: '文件库', icon: FolderOpen, tabType: 'files' },
   { id: 'schedule', label: '定时任务', icon: Clock, tabType: 'schedule' },
   { id: 'monitor', label: '监控工作流', icon: Radio, tabType: 'monitor' },
+  { id: 'ws-debug', label: 'WS 调试台', icon: Terminal, tabType: 'ws-debug' },
   { id: 'trading', label: '交易管理', icon: Receipt, tabType: 'trading' },
   { id: 'agent', label: 'Agent', icon: Bot, tabType: 'agent' },
 ];

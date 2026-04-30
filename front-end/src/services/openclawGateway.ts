@@ -17,6 +17,9 @@ const WS_LOG_MAX = 500
 const _wsLogBuffer: WsLogEntry[] = []
 const _wsLogSubscribers = new Set<(entry: WsLogEntry) => void>()
 
+/**
+ * 记录一条 WebSocket 收发帧日志，并同步通知日志订阅者。
+ */
 function logWs(prefix: string, data: unknown) {
   // 输出到控制台，被main进程捕获并写入openclaw-gateway-ws.log
   console.log(`[WS ${prefix}]`, JSON.stringify(data))
@@ -26,10 +29,16 @@ function logWs(prefix: string, data: unknown) {
   _wsLogSubscribers.forEach(fn => fn(entry))
 }
 
+/**
+ * 返回当前缓存的 WebSocket 日志快照。
+ */
 export function getWsLogBuffer(): WsLogEntry[] {
   return [..._wsLogBuffer]
 }
 
+/**
+ * 订阅后续的 WebSocket 日志事件，并返回取消订阅函数。
+ */
 export function subscribeWsLog(fn: (entry: WsLogEntry) => void): () => void {
   _wsLogSubscribers.add(fn)
   return () => _wsLogSubscribers.delete(fn)
@@ -43,6 +52,9 @@ interface GatewayConfig {
   GATEWAY_KEY: string
 }
 
+/**
+ * 从环境变量读取 Gateway 的 HTTP/WS 地址和访问密钥。
+ */
 function loadGatewayConfig(): GatewayConfig {
   const gatewayUrl = (import.meta.env.VITE_OPENCLAW_GATEWAY_URL as string) || 'http://127.0.0.1:18789'
   const gatewayKey = (import.meta.env.VITE_OPENCLAW_GATEWAY_KEY as string) || ''
@@ -54,10 +66,16 @@ const config = loadGatewayConfig()
 
 const STORAGE_KEY = 'openclaw-token'
 
+/**
+ * 优先从本地存储读取 token，缺失时回退到环境配置值。
+ */
 export function getToken(): string {
   return localStorage.getItem(STORAGE_KEY) || config.GATEWAY_KEY || ''
 }
 
+/**
+ * 返回当前生效的 Gateway 配置。
+ */
 export function getGatewayConfig(): GatewayConfig {
   return config
 }
@@ -79,6 +97,9 @@ let ws: ExtWebSocket | null = null
 let messageId = 0
 const pendingRequests = new Map<string, PendingRequest>()
 
+/**
+ * 按请求 ID 终止一个待处理请求，并将错误传回调用方。
+ */
 function rejectRequest(id: string, error: Error) {
   const req = pendingRequests.get(id)
   if (!req) return
@@ -86,6 +107,9 @@ function rejectRequest(id: string, error: Error) {
   req.reject(error)
 }
 
+/**
+ * 处理 Gateway 返回的响应帧和事件帧，并把消息路由到对应请求。
+ */
 function handleGatewayMessage(data: any) {
   // 直接响应（type: 'res'，带 id）
   if (data.id && pendingRequests.has(data.id)) {
@@ -162,6 +186,9 @@ function handleGatewayMessage(data: any) {
   }
 }
 
+/**
+ * 获取一个已认证的 WebSocket 连接；若连接不存在则创建并完成握手。
+ */
 function getWebSocket(): Promise<ExtWebSocket> {
   return new Promise((resolve, reject) => {
     if (ws && ws.readyState === WebSocket.OPEN && ws._authenticated) {
@@ -303,6 +330,9 @@ export async function checkGatewayStatus(): Promise<boolean> {
   }
 }
 
+/**
+ * 主动关闭当前 WebSocket 连接，并清空连接引用。
+ */
 export function closeGatewayConnection() {
   if (ws) {
     ws.close()
@@ -317,10 +347,16 @@ export function getWsReadyState(): number | null {
   return ws ? ws.readyState : null
 }
 
+/**
+ * 返回当前 WebSocket 是否已经完成 Gateway 认证。
+ */
 export function getWsAuthenticated(): boolean {
   return !!(ws && ws._authenticated)
 }
 
+/**
+ * 返回当前仍在等待 Gateway 完成的请求数量。
+ */
 export function getPendingRequestCount(): number {
   return pendingRequests.size
 }

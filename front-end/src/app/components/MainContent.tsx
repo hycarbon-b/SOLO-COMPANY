@@ -9,10 +9,11 @@ import { AboutPage } from './AboutPage';
 import { SchedulePage } from './SchedulePage';
 import { MarketPage } from './MarketPage';
 import { MonitorPage } from './MonitorPage';
+import { WsPlaygroundPage } from './WsPlaygroundPage';
 import { useChatSession } from '../hooks/useChatSession';
 
 // === Tab Types ===
-export type TabType = 'home' | 'files' | 'trading' | 'market' | 'agent' | 'schedule' | 'usage' | 'about' | 'chat' | 'web' | 'monitor';
+export type TabType = 'home' | 'files' | 'trading' | 'market' | 'agent' | 'schedule' | 'usage' | 'about' | 'chat' | 'web' | 'monitor' | 'ws-debug';
 
 export interface Tab {
   id: string;           // unique tab id
@@ -80,6 +81,8 @@ export function MainContent({
         return <SchedulePage />;
       case 'monitor':
         return <MonitorPage />;
+      case 'ws-debug':
+        return <WsPlaygroundPage />;
       case 'usage':
         return <UsagePage />;
       case 'about':

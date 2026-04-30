@@ -1,6 +1,6 @@
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { FileText, Image, Table, MoreVertical, Trash2, Eye, RefreshCw } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { DiscussionThread } from '../../types/discussion';
 import type { ElectronAPI } from '../../types/electron';
 import { WorkerStatusPanel } from './WorkerStatusPanel';
@@ -23,8 +23,12 @@ export function RightPanelContainer({ onAgentTaskComplete }: RightPanelContainer
   const [files, setFiles] = useState<FileItem[]>([]);
   const electronAPI = (window as Window & { electronAPI?: ElectronAPI }).electronAPI;
 
+  // Stable ref so polling effect doesn't re-run when callback identity changes
+  const onAgentTaskCompleteRef = useRef(onAgentTaskComplete);
+  onAgentTaskCompleteRef.current = onAgentTaskComplete;
+
   // Load files from Electron API
-  const loadResourceFiles = async () => {
+  const loadResourceFiles = useCallback(async () => {
     try {
       if (electronAPI) {
         const result = await electronAPI.getResourceFiles();
@@ -35,7 +39,7 @@ export function RightPanelContainer({ onAgentTaskComplete }: RightPanelContainer
     } catch (e) {
       console.error('Failed to load resource files:', e);
     }
-  };
+  }, [electronAPI]);
 
   // Initialize file watching
   useEffect(() => {
@@ -45,7 +49,7 @@ export function RightPanelContainer({ onAgentTaskComplete }: RightPanelContainer
     return () => {
       electronAPI?.unwatchResourceFiles();
     };
-  }, [electronAPI]);
+  }, [electronAPI, loadResourceFiles]);
 
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
@@ -75,7 +79,7 @@ export function RightPanelContainer({ onAgentTaskComplete }: RightPanelContainer
           if (threadTime <= lastUpdateRef.current) continue;
           if (thread.endRecord && !completedThreadIdsRef.current.has(thread.id)) {
             completedThreadIdsRef.current.add(thread.id);
-            onAgentTaskComplete?.(thread);
+            onAgentTaskCompleteRef.current?.(thread);
           }
           lastUpdateRef.current = threadTime;
         }
@@ -87,7 +91,9 @@ export function RightPanelContainer({ onAgentTaskComplete }: RightPanelContainer
     fetchDiscussions();
     const interval = setInterval(fetchDiscussions, 5000);
     return () => clearInterval(interval);
-  }, [electronAPI, onAgentTaskComplete]);
+  // Only re-subscribe if the Electron API object itself changes (app reload)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [electronAPI]);
 
   return (
     <>

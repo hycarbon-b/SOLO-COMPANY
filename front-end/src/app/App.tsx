@@ -11,7 +11,7 @@ import {
 } from '../services/conversationStore';
 import {
   Home, FileText, TrendingUp, Table, Cpu, Activity,
-  HardDrive, Target, Globe, Plus, X, Radio
+  HardDrive, Target, Globe, Plus, X, Radio, Terminal
 } from 'lucide-react';
 
 // === Tab Icons ===
@@ -27,6 +27,7 @@ const TAB_ICONS: Record<TabType, React.ReactNode> = {
   chat: <Target className="w-3.5 h-3.5 flex-shrink-0" />,
   web: <Globe className="w-3.5 h-3.5 flex-shrink-0" />,
   monitor: <Radio className="w-3.5 h-3.5 flex-shrink-0" />,
+  'ws-debug': <Terminal className="w-3.5 h-3.5 flex-shrink-0" />,
 };
 
 // === Full-width Edge/Figma-style TabBar ===
@@ -226,7 +227,7 @@ export default function App() {
     return () => window.removeEventListener('yuanji:do-reset', handler);
   }, []);
 
-  const handleAddTask = (title: string): string => {
+  const handleAddTask = useCallback((title: string): string => {
     const newTask: Task = {
       id: newConversationId(),
       title: title || '新工作',
@@ -237,15 +238,15 @@ export default function App() {
     setTasks(prev => [newTask, ...prev]);
     setCurrentTaskId(newTask.id);
     return newTask.id;
-  };
+  }, []);
 
-  const handleMarkAsRead = (taskId: string) => {
+  const handleMarkAsRead = useCallback((taskId: string) => {
     setTasks(prev => prev.map(task =>
       task.id === taskId ? { ...task, hasUnread: false } : task
     ));
-  };
+  }, []);
 
-  const handleUpdateTaskTitle = (taskId: string, newTitle: string) => {
+  const handleUpdateTaskTitle = useCallback((taskId: string, newTitle: string) => {
     setTasks(prev => prev.map(task =>
       task.id === taskId ? { ...task, title: newTitle } : task
     ));
@@ -253,27 +254,26 @@ export default function App() {
     setTabs(prev => prev.map(t =>
       t.type === 'chat' && t.taskId === taskId ? { ...t, title: newTitle } : t
     ));
-  };
+  }, []);
 
-  const handleDeleteTask = (taskId: string) => {
+  const handleDeleteTask = useCallback((taskId: string) => {
     setTasks(prev => prev.filter(task => task.id !== taskId));
-    if (currentTaskId === taskId) setCurrentTaskId(null);
+    setCurrentTaskId(prev => prev === taskId ? null : prev);
     // Close the corresponding chat tab if open
-    const chatTabId = `chat-${taskId}`;
-    handleCloseTab(chatTabId);
-  };
+    handleCloseTab(`chat-${taskId}`);
+  }, [handleCloseTab]);
 
-  const handleTogglePin = (taskId: string) => {
+  const handleTogglePin = useCallback((taskId: string) => {
     setTasks(prev => prev.map(task =>
       task.id === taskId ? { ...task, pinned: !task.pinned } : task
     ));
-  };
+  }, []);
 
-  const handleUpdateTaskStatus = (taskId: string, status: 'idle' | 'working' | 'completed' | 'error') => {
+  const handleUpdateTaskStatus = useCallback((taskId: string, status: 'idle' | 'working' | 'completed' | 'error') => {
     setTasks(prev => prev.map(task =>
       task.id === taskId ? { ...task, status } : task
     ));
-  };
+  }, []);
 
   return (
     <>
