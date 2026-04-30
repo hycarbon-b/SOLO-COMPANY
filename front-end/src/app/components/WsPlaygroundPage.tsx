@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Terminal, ArrowUp, ArrowDown, ChevronDown, ChevronRight,
-  Trash2, Wifi, WifiOff, Send, RotateCcw
+  Trash2, Wifi, WifiOff, Send, RotateCcw, FolderOpen, X, RefreshCw
 } from 'lucide-react';
 const uuid = () => crypto.randomUUID();
 
@@ -126,6 +126,61 @@ export function WsPlaygroundPage() {
   const [tplIdx, setTplIdx]   = useState(0);
   const wsRef   = useRef<WebSocket | null>(null);
   const logRef  = useRef<HTMLDivElement>(null);
+
+  // ── 历史 JSONL 回放 ────────────────────────────────────────────────
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const [pickerFiles, setPickerFiles] = useState<Array<{ name: string; sessionKey: string; size: number; mtime: number }>>([]);
+  const [pickerError, setPickerError] = useState<string | null>(null);
+  const [historyKey, setHistoryKey] = useState<string | null>(null);
+
+  const formatBytes = (n: number) =>
+    n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 / 1024).toFixed(2)} MB`;
+
+  const refreshSessions = useCallback(async () => {
+    const api = (window as any).electronAPI;
+    if (!api?.wsCaptureList) {
+      setPickerError('当前环境不可用（仅 Electron 支持）');
+      return;
+    }
+    setPickerLoading(true);
+    setPickerError(null);
+    try {
+      const r = await api.wsCaptureList();
+      if (!r?.ok) throw new Error(r?.error || '读取失败');
+      setPickerFiles(r.files || []);
+    } catch (e: any) {
+      setPickerError(e?.message || String(e));
+    } finally {
+      setPickerLoading(false);
+    }
+  }, []);
+
+  const openPicker = useCallback(() => {
+    setPickerOpen(true);
+    refreshSessions();
+  }, [refreshSessions]);
+
+  const loadHistory = useCallback(async (sessionKey: string) => {
+    const api = (window as any).electronAPI;
+    if (!api?.wsCaptureRead) return;
+    try {
+      const r = await api.wsCaptureRead(sessionKey);
+      if (!r?.ok) throw new Error(r?.error || '读取失败');
+      const lines: any[] = r.lines || [];
+      const mapped: LogEntry[] = lines.map((ln) => ({
+        id: ++_seq,
+        dir: ln.dir === 'SEND' ? 'SEND' : 'RECV',
+        ts: typeof ln.ts === 'number' ? ln.ts : Date.now(),
+        data: ln.data,
+      }));
+      setEntries(mapped);
+      setHistoryKey(sessionKey);
+      setPickerOpen(false);
+    } catch (e: any) {
+      setPickerError(e?.message || String(e));
+    }
+  }, []);
 
   // auto-scroll
   useEffect(() => {
@@ -310,11 +365,35 @@ export function WsPlaygroundPage() {
         {/* ── 右侧消息流 ────────────────────────────────────────── */}
         <div className="flex-1 flex flex-col overflow-hidden">
           <div className="flex items-center px-3 py-2 border-b border-gray-800 gap-2 flex-shrink-0">
-            <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider flex-1">消息流</span>
+            <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider flex-1">
+              消息流
+              {historyKey && (
+                <span className="ml-2 normal-case tracking-normal text-[10px] text-amber-400 font-mono">
+                  · 历史回放：{historyKey}
+                </span>
+              )}
+            </span>
             <span className="text-[10px] text-gray-600">{entries.length} 条</span>
+            <button
+              onClick={openPicker}
+              title="加载缓存 JSONL（按 sessionKey）"
+              className="p-1.5 rounded-md hover:bg-gray-800 text-gray-500 hover:text-amber-300 transition-colors"
+            >
+              <FolderOpen className="w-3.5 h-3.5" />
+            </button>
+            {historyKey && (
+              <button
+                onClick={() => { setEntries([]); setHistoryKey(null); _seq = 0; }}
+                title="退出历史回放"
+                className="px-2 py-0.5 rounded text-[10px] font-medium bg-amber-800/60 text-amber-200 hover:bg-amber-700/70 transition-colors"
+              >
+                退出回放
+              </button>
+            )}
             <button
               onClick={() => {
                 setEntries([]);
+                setHistoryKey(null);
                 _seq = 0;
               }}
               title="清空日志"
@@ -337,7 +416,7 @@ export function WsPlaygroundPage() {
             {entries.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 text-gray-700">
                 <Terminal className="w-8 h-8 mb-2 opacity-40" />
-                <p className="text-xs">点击「连接」开始监听</p>
+                <p className="text-xs">点击「连接」开始监听，或加载历史 JSONL</p>
               </div>
             ) : (
               entries.map(e => <EntryRow key={e.id} entry={e} />)
@@ -345,6 +424,59 @@ export function WsPlaygroundPage() {
           </div>
         </div>
       </div>
+
+      {/* JSONL 会话选择弹窗 */}
+      {pickerOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          onClick={() => setPickerOpen(false)}
+        >
+          <div
+            className="w-[560px] max-h-[70vh] flex flex-col bg-gray-900 border border-gray-700 rounded-xl shadow-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-700 bg-gray-800">
+              <FolderOpen className="w-4 h-4 text-amber-400" />
+              <p className="flex-1 text-sm font-semibold text-gray-100">加载缓存 JSONL（按 sessionKey）</p>
+              <button onClick={refreshSessions} title="刷新" className="p-1 rounded hover:bg-gray-700 text-gray-400">
+                <RefreshCw className={`w-3.5 h-3.5 ${pickerLoading ? 'animate-spin' : ''}`} />
+              </button>
+              <button onClick={() => setPickerOpen(false)} title="关闭" className="p-1 rounded hover:bg-gray-700 text-gray-400">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {pickerError && (
+                <div className="px-4 py-3 text-xs text-red-400 border-b border-red-900/40 bg-red-950/30">
+                  {pickerError}
+                </div>
+              )}
+              {pickerLoading ? (
+                <div className="px-4 py-8 text-center text-xs text-gray-500">加载中…</div>
+              ) : pickerFiles.length === 0 && !pickerError ? (
+                <div className="px-4 py-8 text-center text-xs text-gray-500">暂无缓存文件</div>
+              ) : (
+                <ul>
+                  {pickerFiles.map(f => (
+                    <li key={f.name} className="border-b border-gray-800 last:border-0">
+                      <button
+                        onClick={() => loadHistory(f.sessionKey)}
+                        className="w-full text-left px-4 py-2.5 hover:bg-gray-800/70 transition-colors"
+                      >
+                        <div className="text-[12px] font-mono text-gray-200 truncate">{f.sessionKey}</div>
+                        <div className="text-[10px] text-gray-500 mt-0.5 flex items-center gap-3">
+                          <span>{formatBytes(f.size)}</span>
+                          <span>{new Date(f.mtime).toLocaleString('zh-CN', { hour12: false })}</span>
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

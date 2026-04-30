@@ -145,6 +145,12 @@ export default function App() {
     return stored.length > 0 ? stored : SEED_TASKS;
   });
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem('sidebar.collapsed') === '1'; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('sidebar.collapsed', sidebarCollapsed ? '1' : '0'); } catch { /* ignore */ }
+  }, [sidebarCollapsed]);
 
   // Persist tasks to localStorage whenever they change
   useEffect(() => {
@@ -297,23 +303,21 @@ export default function App() {
 
         {/* Content area — border-top creates the "active tab merge" line */}
         <div className="flex-1 overflow-hidden border-t border-neutral-200">
-          <PanelGroup direction="horizontal">
-            <Panel defaultSize={15} minSize={12} maxSize={25}>
-              <Sidebar
-                tasks={tasks}
-                onDeleteTask={handleDeleteTask}
-                onTogglePin={handleTogglePin}
-                onMarkAsRead={handleMarkAsRead}
-                currentTaskId={currentTaskId}
-                setCurrentTaskId={setCurrentTaskId}
-                activeTabType={activeTab?.type ?? 'home'}
-                onOpenTab={handleOpenTab}
-              />
-            </Panel>
-
-            <PanelResizeHandle className="w-px bg-neutral-200 hover:bg-blue-400 transition-colors cursor-col-resize" />
-
-            <Panel defaultSize={85} minSize={50}>
+          <div className="h-full flex">
+            <Sidebar
+              tasks={tasks}
+              onDeleteTask={handleDeleteTask}
+              onTogglePin={handleTogglePin}
+              onMarkAsRead={handleMarkAsRead}
+              currentTaskId={currentTaskId}
+              setCurrentTaskId={setCurrentTaskId}
+              activeTabType={activeTab?.type ?? 'home'}
+              onOpenTab={handleOpenTab}
+              collapsed={sidebarCollapsed}
+              onToggleCollapsed={() => setSidebarCollapsed(v => !v)}
+            />
+            <div className="w-px bg-neutral-200 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
               <MainContent
                 onAddTask={handleAddTask}
                 tasks={tasks}
@@ -324,8 +328,8 @@ export default function App() {
                 onOpenTab={handleOpenTab}
                 onCloseTab={handleCloseTab}
               />
-            </Panel>
-          </PanelGroup>
+            </div>
+          </div>
         </div>
       </div>
     </>

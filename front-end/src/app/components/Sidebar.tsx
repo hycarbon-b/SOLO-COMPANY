@@ -1,4 +1,4 @@
-import { Plus, LayoutDashboard, FolderOpen, Receipt, Bot, BarChart3, Info, Trash2, Pin, PinOff, Clock, LineChart, Radio, Terminal, type LucideIcon } from 'lucide-react';
+import { Plus, LayoutDashboard, FolderOpen, Receipt, Bot, BarChart3, Info, Trash2, Pin, PinOff, Clock, LineChart, Radio, Terminal, PanelLeftClose, PanelLeftOpen, type LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import { Task } from '../App';
 import type { TabType } from './MainContent';
@@ -13,6 +13,8 @@ interface SidebarProps {
   setCurrentTaskId: (taskId: string | null) => void;
   activeTabType: string;
   onOpenTab: (tabType: TabType, title: string, taskId?: string) => void;
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
 }
 
 interface NavItem {
@@ -41,7 +43,7 @@ const BOTTOM_NAV: NavItem[] = [
   { id: 'about', label: '关于本机', icon: Info, tabType: 'about' },
 ];
 
-export function Sidebar({ tasks, onDeleteTask, onTogglePin, onMarkAsRead, currentTaskId, setCurrentTaskId, activeTabType, onOpenTab }: SidebarProps) {
+export function Sidebar({ tasks, onDeleteTask, onTogglePin, onMarkAsRead, currentTaskId, setCurrentTaskId, activeTabType, onOpenTab, collapsed = false, onToggleCollapsed }: SidebarProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; taskId: string } | null>(null);
 
   const goToTab = (item: NavItem) => {
@@ -52,6 +54,20 @@ export function Sidebar({ tasks, onDeleteTask, onTogglePin, onMarkAsRead, curren
   const renderNavButton = (item: NavItem, extraClass = '') => {
     const Icon = item.icon;
     const active = activeTabType === item.tabType;
+    if (collapsed) {
+      return (
+        <button
+          key={item.id}
+          title={item.label}
+          className={`w-10 h-10 flex items-center justify-center rounded-lg transition-all mx-auto ${
+            active ? 'bg-gray-100 text-gray-900' : 'text-gray-700 hover:bg-gray-100'
+          }`}
+          onClick={() => goToTab(item)}
+        >
+          <Icon className="w-4 h-4" />
+        </button>
+      );
+    }
     return (
       <button
         key={item.id}
@@ -82,12 +98,61 @@ export function Sidebar({ tasks, onDeleteTask, onTogglePin, onMarkAsRead, curren
 
   const handleCloseContextMenu = () => setContextMenu(null);
 
+  if (collapsed) {
+    return (
+      <aside className="h-full bg-white flex flex-col w-14 flex-shrink-0">
+        {/* Top: expand button only (logo hidden) */}
+        <div className="p-2 flex flex-col items-center">
+          <button
+            title="展开侧边栏"
+            className="w-10 h-8 flex items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100"
+            onClick={onToggleCollapsed}
+          >
+            <PanelLeftOpen className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Nav (icons only) */}
+        <nav className="flex-1 overflow-y-auto scrollbar-none px-2 py-2 space-y-1">
+          {PRIMARY_NAV.map(item => renderNavButton(item))}
+          {MIDDLE_NAV.map(item => renderNavButton(item))}
+          <button
+            title="新建工作"
+            className={`w-10 h-10 flex items-center justify-center rounded-lg mx-auto transition-colors ${
+              activeTabType === 'home' && currentTaskId === null
+                ? 'bg-gray-100 text-gray-900'
+                : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+            }`}
+            onClick={() => {
+              setCurrentTaskId(null);
+              onOpenTab('home', '首页');
+            }}
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </nav>
+
+        {/* Bottom Section: replace icons with logo */}
+        <div className="p-2 flex items-center justify-center">
+          <img src={logo} alt="YUANJI T" className="w-7 h-7 flex-shrink-0" />
+        </div>
+      </aside>
+    );
+  }
+
   return (
-    <aside className="h-full bg-white flex flex-col">
+    <aside className="h-full bg-white flex flex-col w-56 flex-shrink-0">
       {/* Logo */}
       <div className="p-4 flex items-center gap-2">
         <img src={logo} alt="YUANJI T" className="w-7 h-7 flex-shrink-0" />
-        <span className="font-semibold text-gray-900 truncate tracking-tight">YUANJI T</span>
+        <span className="font-semibold text-gray-900 truncate tracking-tight flex-1">YUANJI T</span>
+        <button
+          title="收起侧边栏"
+          className="w-7 h-7 flex items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-700 flex-shrink-0"
+          onClick={onToggleCollapsed}
+        >
+          <PanelLeftClose className="w-4 h-4" />
+        </button>
       </div>
 
       {/* Main Navigation */}
