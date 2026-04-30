@@ -1,0 +1,22 @@
+{
+  "type": "event",
+  "event": "agent",
+  "payload": {
+    "runId": "ce0f78b5-20a1-4785-8875-f3444620341d",
+    "stream": "item",
+    "data": {
+      "itemId": "tool:call_4f8dc217c82540db98a40804",
+      "phase": "update",
+      "kind": "tool",
+      "title": "exec fetch url, `curl -s \"wttr.in/Shanghai?0\"`",
+      "status": "running",
+      "name": "exec",
+      "meta": "fetch url, `curl -s \"wttr.in/Shanghai?0\"`",
+      "toolCallId": "call_4f8dc217c82540db98a40804"
+    },
+    "sessionKey": "agent:main:main",
+    "seq": 13,
+    "ts": 1777512931264
+  },
+  "seq": 11
+}

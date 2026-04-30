@@ -4,6 +4,7 @@
  */
 
 import { FileText, Table, Image as ImageIcon } from 'lucide-react';
+import type { ToolCallSnapshot } from '../types/agentStream';
 
 export interface Message {
   id: string;
@@ -15,6 +16,8 @@ export interface Message {
   isStrategy?: boolean;
   isStockPicker?: boolean;
   isStockPickerCode?: boolean;
+  /** 本条 assistant 消息伴随产生的工具调用快照（按工具调用顺序） */
+  toolCalls?: ToolCallSnapshot[];
 }
 
 export interface LibraryFile {

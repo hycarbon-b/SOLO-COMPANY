@@ -6,6 +6,7 @@ import { type Message } from '../fakeChatData';
 import { ChatComposer } from './ChatComposer';
 import { StrategyCard } from './StrategyCard';
 import { StockPickerTable } from './StockPickerTable';
+import { ToolCallList } from './ToolCallList';
 
 // 演示用：双均线策略示例代码（fakeChatData 中 isStrategy 消息使用）
 const DUAL_MA_STRATEGY_CODE = `# 双均线交易策略
@@ -251,7 +252,8 @@ export function ChatPanel({ messages, isTyping, inputValue, setInputValue, onSen
               !message.isStrategy &&
               !message.isStockPicker &&
               !message.isStockPickerCode &&
-              message.type !== 'html'
+              message.type !== 'html' &&
+              !(message.toolCalls && message.toolCalls.length > 0)
             ) return null;
             
             return (
@@ -262,6 +264,11 @@ export function ChatPanel({ messages, isTyping, inputValue, setInputValue, onSen
                       <span className="text-white text-xs">AI</span>
                     </div>
                     <div className="flex-1">
+                      {message.toolCalls && message.toolCalls.length > 0 && (
+                        <div className="max-w-2xl">
+                          <ToolCallList toolCalls={message.toolCalls} />
+                        </div>
+                      )}
                       {message.type === 'html' ? (
                         <div className="max-w-4xl">
                           <HtmlCardFrame html={message.content} />
@@ -291,11 +298,11 @@ export function ChatPanel({ messages, isTyping, inputValue, setInputValue, onSen
                         </div>
                       ) : message.isStockPickerCode ? (
                         <StockPickerCodeBubble />
-                      ) : (
+                      ) : message.content ? (
                         <div className="bg-white rounded-2xl px-4 py-3 inline-block max-w-2xl shadow-sm">
                           <MdContent>{message.content}</MdContent>
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 )}

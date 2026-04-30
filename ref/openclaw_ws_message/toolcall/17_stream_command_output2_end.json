@@ -1,0 +1,24 @@
+{
+  "type": "event",
+  "event": "agent",
+  "payload": {
+    "runId": "ce0f78b5-20a1-4785-8875-f3444620341d",
+    "stream": "command_output",
+    "data": {
+      "itemId": "command:call_4f8dc217c82540db98a40804",
+      "phase": "end",
+      "title": "command fetch url, `curl -s \"wttr.in/Shanghai?0\"`",
+      "toolCallId": "call_4f8dc217c82540db98a40804",
+      "name": "exec",
+      "output": "Weather report: Shanghai\n\n  [38;5;226m   \\  /[0m       Partly cloudy\n  [38;5;226m _ /\"\"[38;5;250m.-.    [0m [38;5;118m+13[0m([38;5;082m12[0m) °C[0m\n  [38;5;226m   \\_[38;5;250m(   ).  [0m [1m↘[0m [38;5;226m13[0m km/h[0m\n  [38;5;226m   /[38;5;250m(___(__) [0m 10 km[0m\n                0.0 mm[0m",
+      "status": "completed",
+      "exitCode": 0,
+      "durationMs": 736,
+      "cwd": "/home/chen/.openclaw/workspace"
+    },
+    "sessionKey": "agent:main:main",
+    "seq": 23,
+    "ts": 1777512931320
+  },
+  "seq": 19
+}

@@ -8,6 +8,8 @@
  *   yuanji:sys:{id}       → string (system prompt)
  */
 
+import type { ToolCallSnapshot } from '../types/agentStream';
+
 export interface StoredTask {
   id: string;
   title: string;
@@ -26,6 +28,7 @@ interface StoredMessage {
   timestamp: string; // ISO-8601
   isStrategy?: boolean;
   isStockPicker?: boolean;
+  toolCalls?: ToolCallSnapshot[];
 }
 
 const TASKS_KEY = 'yuanji:tasks';

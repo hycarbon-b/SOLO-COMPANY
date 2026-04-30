@@ -4,6 +4,8 @@
  * 从 .env 加载：VITE_OPENCLAW_GATEWAY_URL, VITE_OPENCLAW_GATEWAY_KEY
  */
 
+import type { AgentStreamEvent } from '../types/agentStream'
+
 // ===== WS帧日志总线 =====
 export interface WsLogEntry {
   id: number
@@ -42,6 +44,27 @@ export function getWsLogBuffer(): WsLogEntry[] {
 export function subscribeWsLog(fn: (entry: WsLogEntry) => void): () => void {
   _wsLogSubscribers.add(fn)
   return () => _wsLogSubscribers.delete(fn)
+}
+
+// ===== Agent stream 事件总线 =====
+// 区别于 WS 日志（原始帧），这里推送的是已分流、已类型化的 agent 事件，
+// 便于 UI 层订阅 lifecycle / item / command_output / assistant 四类。
+
+const _agentEventSubscribers = new Set<(evt: AgentStreamEvent) => void>()
+
+function emitAgentEvent(evt: AgentStreamEvent) {
+  _agentEventSubscribers.forEach(fn => {
+    try { fn(evt) } catch (e) { console.error('[Gateway] agent event subscriber error:', e) }
+  })
+}
+
+/**
+ * 订阅所有 runId 的 agent 流式事件（已分流为 typed event）。
+ * 返回取消订阅函数。
+ */
+export function subscribeAgentEvents(fn: (evt: AgentStreamEvent) => void): () => void {
+  _agentEventSubscribers.add(fn)
+  return () => _agentEventSubscribers.delete(fn)
 }
 
 // ===== 配置 =====
@@ -88,7 +111,10 @@ interface ExtWebSocket extends WebSocket {
 interface PendingRequest {
   sessionKey: string
   onStream?: ((chunk: string, accumulated: string, isNewSegment?: boolean) => void) | null
+  /** 工具流事件回调，按 runId 绑定后接收所有 stream 类型 */
+  onAgentEvent?: ((evt: AgentStreamEvent) => void) | null
   _accumulatedText: string
+  _boundRunId?: string
   resolve: (result: { text: string }) => void
   reject: (err: Error) => void
 }
@@ -144,6 +170,26 @@ function handleGatewayMessage(data: any) {
 
   // === agent 事件：流式文本（payload.data.text 是全量累积文本）===
   if (data.event === 'agent') {
+    // 1) 优先按 typed stream 分发到全局总线 + 请求级 onAgentEvent
+    const stream = payload.stream as AgentStreamEvent['stream'] | undefined
+    if (stream === 'lifecycle' || stream === 'item' || stream === 'command_output' || stream === 'assistant') {
+      const evt = {
+        runId: payload.runId,
+        seq: payload.seq,
+        ts: payload.ts,
+        sessionKey: payload.sessionKey,
+        stream,
+        data: payload.data,
+      } as AgentStreamEvent
+      // 绑定 runId（防止 followup run 串扰）
+      if (!req._boundRunId && evt.runId) req._boundRunId = evt.runId
+      if (!req._boundRunId || req._boundRunId === evt.runId) {
+        req.onAgentEvent?.(evt)
+      }
+      emitAgentEvent(evt)
+    }
+
+    // 2) 仍按旧逻辑维护 assistant 文本累积，保持向后兼容
     const d = payload.data
     if (d && typeof d.text === 'string' && d.text.length > 0) {
       const newText: string = d.text
@@ -271,11 +317,13 @@ function getWebSocket(): Promise<ExtWebSocket> {
  * @param message 用户消息内容
  * @param onStream 流式回调，每次有新内容时调用 (chunk, accumulated)
  * @param systemPrompt 可选的系统提示词，用于设定 AI 角色和场景
+ * @param onAgentEvent 可选的工具流事件回调，按 runId 绑定，接收 lifecycle/item/command_output/assistant
  */
 export async function callOpenClawGateway(
   message: string,
   onStream?: ((chunk: string, accumulated: string, isNewSegment?: boolean) => void) | null,
-  systemPrompt?: string
+  systemPrompt?: string,
+  onAgentEvent?: ((evt: AgentStreamEvent) => void) | null
 ): Promise<{ text: string }> {
   const socket = await getWebSocket()
   const id = `${Date.now()}-${++messageId}-${Math.random().toString(36).slice(2, 8)}`
@@ -289,6 +337,7 @@ export async function callOpenClawGateway(
     pendingRequests.set(id, {
       sessionKey,
       onStream,
+      onAgentEvent,
       _accumulatedText: '',
       resolve: (result) => {
         clearTimeout(timeout)

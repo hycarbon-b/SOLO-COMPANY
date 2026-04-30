@@ -1,0 +1,25 @@
+{
+  "type": "event",
+  "event": "agent",
+  "payload": {
+    "runId": "ce0f78b5-20a1-4785-8875-f3444620341d",
+    "stream": "item",
+    "data": {
+      "itemId": "command:call_ba4f4051d3b44ff69eb6013e",
+      "phase": "end",
+      "kind": "command",
+      "title": "command fetch url, `curl -s \"wttr.in/Shanghai?format=%l:+%c+%t+(体感+%f),+%w+风,+%h+湿度\"`",
+      "status": "completed",
+      "name": "exec",
+      "meta": "fetch url, `curl -s \"wttr.in/Shanghai?format=%l:+%c+%t+(体感+%f),+%w+风,+%h+湿度\"`",
+      "toolCallId": "call_ba4f4051d3b44ff69eb6013e",
+      "startedAt": 1777512930398,
+      "endedAt": 1777512931295,
+      "summary": "shanghai: ⛅  +13°C (体感 +12°C), ↘13km/h 风, 77% 湿度"
+    },
+    "sessionKey": "agent:main:main",
+    "seq": 18,
+    "ts": 1777512931295
+  },
+  "seq": 15
+}

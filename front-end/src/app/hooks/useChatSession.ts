@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { callOpenClawGateway } from '../../services/openclawGateway';
 import { loadMessages, saveMessages, loadSysPrompt, saveSysPrompt } from '../../services/conversationStore';
+import { reduceToolCalls, type ToolCallSnapshot } from '../../types/agentStream';
 import chatConfig from '../config/chatConfig.json';
 import type { Message } from '../fakeChatData';
 import { fakeMessagesMap } from '../fakeChatData';
@@ -227,6 +228,9 @@ export function useChatSession({
     let currentAsstMsgId = assistantMsgId;
     appendMsg({ id: assistantMsgId, role: 'assistant', content: '', timestamp: new Date() });
 
+    // 工具调用快照表（同 run 内累积），实时回写到当前 assistant 消息
+    let toolCallMap: Record<string, ToolCallSnapshot> = {};
+
     setIsTyping(true);
 
     try {
@@ -244,7 +248,16 @@ export function useChatSession({
           }
           patchMsg(currentAsstMsgId, () => ({ content: accumulated }));
         },
-        finalSystemPrompt
+        finalSystemPrompt,
+        (evt) => {
+          // 仅消费工具相关 stream，assistant/lifecycle 不影响 toolCalls
+          if (evt.stream !== 'item' && evt.stream !== 'command_output') return;
+          toolCallMap = reduceToolCalls(toolCallMap, evt);
+          const list = Object.values(toolCallMap).sort(
+            (a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0)
+          );
+          patchMsg(currentAsstMsgId, () => ({ toolCalls: list }));
+        }
       );
 
       patchMsg(currentAsstMsgId, m => (m.content ? {} : { content: text || '' }));
